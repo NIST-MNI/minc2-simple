@@ -15,7 +15,8 @@ enum  minc2_dimensions {
   MINC2_DIM_Y,
   MINC2_DIM_Z,
   MINC2_DIM_TIME,
-  MINC2_DIM_VEC
+  MINC2_DIM_VEC,
+  MINC2_DIM_END=255
 };
 
 /**
@@ -37,8 +38,24 @@ enum  minc2_type {
   MINC2_ICOMPLEX = 1001,  /**< 32-bit signed integer complex */
   MINC2_FCOMPLEX = 1002,  /**< 32-bit floating point complex */
   MINC2_DCOMPLEX = 1003,  /**< 64-bit floating point complex */
+  MINC2_MAX_TYPE_ID,
   MINC2_UNKNOWN  = -1     /**< when the type is a record */
 };
+
+/**
+ * minc2 dimension information
+ */
+struct minc2_dimension
+{
+  int    id;             /**< dimension id, see enum minc2_dimensions*/
+  int    length;         /**< dimension length */
+  int    irregular;      /**< flag to show irregular sampling */
+  double step;           /**< dimension step   */
+  double start;          /**< dimension start  */
+  int    have_dir_cos;   /**< flag that dimension cosines is valid*/
+  double dir_cos[3];     /**< direction cosines*/
+};
+
 
 /**
  * minc2 error codes, compatible with minc2 API
@@ -82,17 +99,62 @@ int minc2_create(minc2_file_handle h,const char * path);
  */
 int minc2_close(minc2_file_handle h);
 
-
 /**
  * query number of dimensions
  */
 int minc2_ndim(minc2_file_handle h,int *ndim);
 
 /**
+ * query total number of voxels
+ */
+int minc2_nelement(minc2_file_handle h,int *nelement);
+
+/**
+ * query data type, used to represent data
+ */
+int minc2_data_type(minc2_file_handle h,int *_type);
+
+/**
+ * query data type, used to store data on disk
+ */
+int minc2_storage_data_type(minc2_file_handle h,int *_type);
+
+/**
  * query number of slice dimensions 
  */
 int minc2_slice_ndim(minc2_file_handle h,int *slice_ndim);
 
+/**
+ * Setup minc file for reading or writing information
+ * in standardized order ( Vector dimension - X - Y -Z -TIME )
+ * with positive steps
+ */
+int minc2_setup_standard_order(minc2_file_handle h);
+
+/**
+ * get dimension information in current representation format
+ */
+int minc2_get_representation_dimensions(minc2_file_handle h,struct minc2_dimension **dims);
+
+/**
+ * get dimension information in file format
+ */
+int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims);
+
+/**
+ * Load complete volume into memory
+ */
+int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representation_type);
+
+/**
+ * return human-readable type name
+ */
+const char * minc2_data_type_name(int minc2_type_id);
+
+/**
+ * return human-readable dimension name
+ */
+const char * minc2_dim_type_name(int minc2_dim_id);
 
 
 #ifdef __cplusplus

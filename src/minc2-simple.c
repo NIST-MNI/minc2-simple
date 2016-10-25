@@ -3,6 +3,7 @@
 #include "minc2-simple.h"
 #include <stdlib.h>
 #include <string.h>
+#include <string.h>
 
 /**
  * internal functions
@@ -25,13 +26,17 @@ struct minc2_file {
   double        *dimension_start;
   double        *dimension_step;
   int            dimension_indeces[5];
-
+  
+  struct         minc2_dimension *store_dims;
+  struct         minc2_dimension *representation_dims;
  
   midimhandle_t *file_dims;
   midimhandle_t *apparent_dims;
   
-  miboolean_t slice_scaling_flag;
-  miboolean_t global_scaling_flag;
+  miboolean_t    slice_scaling_flag;
+  miboolean_t    global_scaling_flag;
+  
+  miboolean_t    using_apparent_order;
 };
 
 /**
@@ -83,7 +88,7 @@ int minc2_open(minc2_file_handle h, const char * path)
                                h->file_dims) < 0 )
     return MINC2_ERROR;
   
-  if ( miget_dimension_sizes(h->file_dims, h->ndims, h->dimension_size) < 0 )
+  if ( miget_dimension_sizes( h->file_dims, h->ndims, h->dimension_size ) < 0 )
     return MINC2_ERROR;
 
   if ( miget_dimension_separations(h->file_dims, MI_ORDER_FILE, h->ndims, h->dimension_step) < 0 )
@@ -109,11 +114,12 @@ int minc2_open(minc2_file_handle h, const char * path)
     h->global_scaling_flag= !(volume_min == valid_min && volume_max == valid_max);
   }
 
-  /*setup normalized representation of data (if needed only)*/
+  /*get dimension information*/
   for (i = 0; i < h->ndims; i++ )
   {
     char *      name;
-    double      _sep;
+    miboolean_t _sampling;
+    
     /*const char *_sign="+";*/
 
     if ( miget_dimension_name(h->file_dims[i], &name) < 0 )
@@ -121,125 +127,69 @@ int minc2_open(minc2_file_handle h, const char * path)
 
     h->dimension_name[i] = name;
     
+    h->store_dims[h->ndims-i-1].length=h->dimension_size[i];
+    
+    miget_dimension_separation(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].step);
+    
+    if(miget_dimension_cosines(h->file_dims[i],&h->store_dims[h->ndims-i-1].dir_cos[0])==MI_NOERROR)
+      h->store_dims[h->ndims-i-1].have_dir_cos=1;
+    else
+      h->store_dims[h->ndims-i-1].have_dir_cos=0;
+    
+    miget_dimension_start(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].start);
+    miget_dimension_sampling_flag(h->file_dims[i],&_sampling);
+    
+    h->store_dims[h->ndims-i-1].irregular=_sampling; /*documentation is wrong*/
+    
     if(!strcmp(name,MIxspace) || !strcmp(name,MIxfrequency) ) /*this is X space*/
-      {
+    {
+      h->store_dims[h->ndims-i-1].id=MINC2_DIM_X;
       h->dimension_indeces[1]=i;
-      }
+    }
     else if(!strcmp(name,MIyspace) || !strcmp(name,MIyfrequency) ) /*this is Y
                                                                       space */
-      {
+    {
+      h->store_dims[h->ndims-i-1].id=MINC2_DIM_Y;
       h->dimension_indeces[2]=i;
-      }
+    }
     else if(!strcmp(name,MIzspace) || !strcmp(name,MIzfrequency) ) /*this is Z
                                                                     space*/
-      {
+    {
+      h->store_dims[h->ndims-i-1].id=MINC2_DIM_Z;
       h->dimension_indeces[3]=i;
-      }
+    }
     else if(!strcmp(name,MIvector_dimension) ) /*this is vector space*/
-      {
+    {
+      h->store_dims[h->ndims-i-1].id=MINC2_DIM_VEC;
       h->dimension_indeces[0]=i;
-      }
+    }
     else if(!strcmp(name,MItime) || !strcmp(name,MItfrequency) ) /*this is time
                                                                    space */
-      {
+    {
+      h->store_dims[h->ndims-i-1].id=MINC2_DIM_TIME;
       h->dimension_indeces[4]=i;
-      }
+    }
     else
-      {
-        MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported dimension type:%s",name);
-        return MINC2_ERROR;
-      }
+    {
+      h->store_dims[h->ndims-i-1].id=MINC2_DIM_TIME;
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported dimension type:%s",name);
+      return MINC2_ERROR;
+    }
   }
-
-  for(i=1; i<4; i++)
-    {
-    if(h->dimension_indeces[i]!=-1) /*this dimension is present*/
-      {
-      spatial_dimension_count++;
-      }
-    }
-
-  if ( spatial_dimension_count == 0 ) /* sorry, this is metaphysical question*/
-    {
-    MI_LOG_ERROR(MI2_MSG_GENERIC,"No spatial dimensions found");
-    return MINC2_ERROR;
-    }
-
-  if ( h->dimension_indeces[0]!=-1 && h->dimension_indeces[4]!=-1 )
-    {
-      MI_LOG_ERROR(MI2_MSG_GENERIC,"time + vector dimensions are not supported simultaneously");
-      return MINC2_ERROR; /*time + vector dimension not supported right now*/
-    }
+  /*mark the end of dimensions*/
+  h->store_dims[h->ndims].id=MINC2_DIM_END;
   
-  /*minc api uses inverse order of dimensions , fastest varying are last*/
-  for(i=3; i>0; i--)
-    {
-    if(h->dimension_indeces[i]!=-1)
-      {
-      misize_t _sz;
-    
-      h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[i]];
-      //always use positive
-      miset_dimension_apparent_voxel_order(h->apparent_dims[usable_dimensions],MI_POSITIVE);
-      miget_dimension_size(h->apparent_dims[usable_dimensions],&_sz);
-
-      /* 
-      std::vector< double > _dir(3);
-      double                _sep,_start;
-
-      miget_dimension_separation(h->m_MincApparentDims[usable_dimensions],MI_ORDER_APPARENT,&_sep);
-      miget_dimension_cosines(h->m_MincApparentDims[usable_dimensions],&_dir[0]);
-      miget_dimension_start(h->m_MincApparentDims[usable_dimensions],MI_ORDER_APPARENT,&_start);
-
-      for(int j=0; j<3; j++)
-        dir_cos[j][i-1]=_dir[j];
-
-      origin[i-1]=_start;
-      sep[i-1]=_sep;
-
-      h->SetDimensions(i-1,static_cast<unsigned int>(_sz) );
-      h->SetDirection(i-1,_dir);
-      h->SetSpacing(i-1,_sep);*/
-
-      spatial_dimension++;
-      usable_dimensions++;
-      }
-    }
-
-  if(h->dimension_indeces[0]!=-1) /* have vector dimension*/
-    {
-    misize_t _sz;
-    h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[0]];
-  
-    miget_dimension_size(h->apparent_dims[usable_dimensions],&_sz);
-    /*numberOfComponents=_sz;*/
-    usable_dimensions++;
-    }
-
-  if(h->dimension_indeces[4]!=-1) /* have time dimension*/
-    {
-    misize_t _sz;
-    h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[4]];
-    /*always use positive*/
-    miset_dimension_apparent_voxel_order(h->apparent_dims[usable_dimensions],MI_POSITIVE);
-    miget_dimension_size(h->apparent_dims[usable_dimensions],&_sz);
-    /*numberOfComponents=_sz;*/
-    usable_dimensions++;
-    }
-
-  /*Set apparent dimension order to the MINC2 api*/
-  if(miset_apparent_dimension_order(h->vol,usable_dimensions,h->apparent_dims)<0)
-    return MINC2_ERROR;  
-
+  /*copy store to reprenetation dimension*/
+  memmove(h->representation_dims,h->store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
 
   if ( miget_data_class(h->vol, &volume_data_class) < 0 )
     return MINC2_ERROR;  
 
   /* set the file data type*/
   if(h->slice_scaling_flag || h->global_scaling_flag)
-    {
+  {
     switch ( h->store_type )
-      {
+    {
       case MI_TYPE_FLOAT:
         h->data_type=MINC2_FLOAT;
         break;
@@ -255,12 +205,12 @@ int minc2_open(minc2_file_handle h, const char * path)
       default:
         h->data_type=MINC2_FLOAT;
         break;
-      } 
-    }
+    } 
+  }
   else /*not using normalization*/
-    {
+  {
     switch ( h->store_type )
-      {
+    {
       case MI_TYPE_BYTE:
         h->data_type=MINC2_BYTE;
         break;
@@ -300,11 +250,11 @@ int minc2_open(minc2_file_handle h, const char * path)
       default:
         MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported file data type");
         return MINC2_ERROR;
-      } 
-    }
+    } 
+  }
 
   switch ( volume_data_class )
-    {
+  {
     case MI_CLASS_REAL:
     case MI_CLASS_INT:
     case MI_CLASS_LABEL: /* create an array of label names and values ?*/
@@ -324,7 +274,109 @@ int minc2_open(minc2_file_handle h, const char * path)
     default:
       MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported data class");
       return MINC2_ERROR;
-    } //end of switch
+  } //end of switch
+}
+
+
+int minc2_setup_standard_order(minc2_file_handle h)
+{
+  int spatial_dimension=0;
+  int usable_dimensions=0;
+  int i;
+  
+  if(!h->store_dims)
+  {
+    /*minc file is not opened or created yet*/
+    return MINC2_ERROR;
+  }
+  
+  /*minc api uses inverse order of dimensions , fastest varying are last*/
+  if(h->dimension_indeces[4]!=-1) /* have time dimension*/
+  {
+    h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[4]];
+    /*always use positive*/
+    miset_dimension_apparent_voxel_order(h->apparent_dims[usable_dimensions],MI_POSITIVE);
+    
+    h->representation_dims[h->ndims-1-usable_dimensions]=h->store_dims[h->ndims-1-h->dimension_indeces[4]];
+    miget_dimension_separation(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].step);
+    miget_dimension_start(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].start);
+    
+    usable_dimensions++;
+  }
+    
+  for(i=3; i>0; i--)
+  {
+    if(h->dimension_indeces[i]!=-1)
+    {
+      h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[i]];
+      /*always use positive*/
+      miset_dimension_apparent_voxel_order(h->apparent_dims[usable_dimensions],MI_POSITIVE);
+      
+      h->representation_dims[h->ndims-1-usable_dimensions]=h->store_dims[h->ndims-1-h->dimension_indeces[i]];
+      miget_dimension_separation(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].step);
+      miget_dimension_start(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].start);
+      
+      spatial_dimension++;
+      usable_dimensions++;
+    }
+  }
+
+  if(h->dimension_indeces[0]!=-1) /* have vector dimension*/
+  {
+    h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[0]];
+    /*should i set positive voxel order too, just in case?*/
+    
+    h->representation_dims[h->ndims-1-usable_dimensions]=h->store_dims[h->ndims-1-h->dimension_indeces[0]];
+    
+    usable_dimensions++;
+  }
+
+  /*Set apparent dimension order to the MINC2 api*/
+  if(miset_apparent_dimension_order(h->vol,usable_dimensions,h->apparent_dims)<0)
+    return MINC2_ERROR;  
+  
+  h->using_apparent_order=1;
+    
+  return MINC2_SUCCESS;
+}
+
+int minc2_close(minc2_file_handle h)
+{
+  if(h->vol)
+  {
+    if ( miclose_volume(h->vol) < 0 )
+      return MINC2_ERROR;
+    
+    return _minc2_cleanup_dimensions(h);
+  } else {
+    /*File was not open?*/
+    return MINC2_ERROR;
+  }
+  
+}
+
+int minc2_ndim(minc2_file_handle h,int *ndim)
+{
+  if(h->ndims)
+  {
+    *ndim=h->ndims;
+  } else 
+    return MINC2_ERROR;
+}
+
+int minc2_nelement(minc2_file_handle h,int *nelement)
+{
+  if(h->ndims && h->dimension_size)
+  {
+    int i;
+    *nelement=1;
+    for (i = 0; i < h->ndims; i++ )
+    {
+      *nelement *= h->dimension_size[i];
+    }
+    return MINC2_SUCCESS; 
+  } else 
+    return MINC2_ERROR;
 }
 
 int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representation_type)
@@ -332,22 +384,29 @@ int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representat
   mitype_t buffer_type=MI_TYPE_UBYTE;
   int usable_dimensions=0;
   int i;
+  int err=MINC2_SUCCESS;
   misize_t *start=(misize_t *)calloc(h->ndims,sizeof(misize_t));
   misize_t *count=(misize_t *)calloc(h->ndims,sizeof(misize_t));
 
-  /*need to specify dimensions in apparent order*/
-  for ( i = 0; i < 5; i++ )
+  if(h->using_apparent_order)
   {
-    if(h->dimension_indeces[i]>=0)
+    /*need to specify dimensions in apparent order, with minc2 convention that fasted dimensions are last*/
+    for ( i = 0; i < h->ndims ; i++ )
     {
-      start[usable_dimensions]=0;
-      count[usable_dimensions]=h->dimension_size[h->dimension_indeces[i]];
-      usable_dimensions++;
+      start[i]=0;
+      count[i]=h->representation_dims[h->ndims-i-1].length;
+    }
+  } else {
+    /*will read information on file order*/
+    for ( i = 0; i < h->ndims ; i++ )
+    {
+      start[i]=0;
+      count[i]=h->store_dims[h->ndims-i-1].length;;
     }
   }
-
+  
   switch(representation_type )
-    {
+  {
     case MINC2_UBYTE:
       buffer_type=MI_TYPE_UBYTE;
       break;
@@ -377,44 +436,95 @@ int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representat
       free( start ); 
       free( count );
       return MINC2_ERROR;
-    }
+  }
 
   if ( miget_real_value_hyperslab(h->vol, buffer_type, start, count, buffer) < 0 )
-  {
-    free( start ); 
-    free( count );
-    return MINC2_ERROR;
-  }
+    err=MINC2_ERROR;
+  else
+    err=MINC2_SUCCESS;
+  
   free( start ); 
   free( count );
+  return err;
+}
+
+
+int minc2_data_type(minc2_file_handle h,int *_type)
+{
+  if(h->data_type>0)
+  {
+    *_type=h->data_type;
+    return MINC2_SUCCESS;
+  } else {
+    /*not initialized!*/
+    return MINC2_ERROR;
+  }
+}
+
+int minc2_storage_data_type(minc2_file_handle h,int *_type)
+{
+  if(h->data_type>0)
+  {
+    *_type=(int)h->store_type;
+    return MINC2_SUCCESS;
+  } else {
+    /*not initialized!*/
+    return MINC2_ERROR;
+  }
+}
+
+
+int minc2_get_representation_dimensions(minc2_file_handle h,struct minc2_dimension **dims)
+{
+  if(!h->representation_dims)
+    return MINC2_ERROR;
+  *dims=h->representation_dims;
   return MINC2_SUCCESS;
 }
+
+int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims)
+{
+  if(!h->store_dims)
+    return MINC2_ERROR;
+  *dims=h->store_dims;
+  return MINC2_SUCCESS;
+}
+
+
 
 static int _minc2_cleanup_dimensions(minc2_file_handle h)
 {
   int i;
   if( h->dimension_name )
-    {
+  {
     for ( i = 0; i < h->ndims; i++ )
-      {
-      mifree_name( h->dimension_name[i] );
+    {
+      if(h->dimension_name[i]) 
+        mifree_name( h->dimension_name[i] );
       h->dimension_name[i]=NULL;
-      }
     }
+    free(h->dimension_name);
+  }
 
-  free(h->dimension_name);
-  free(h->dimension_size);
-  free(h->dimension_start);
-  free(h->dimension_step);
-  free(h->file_dims);
-  free(h->apparent_dims);
-
+  
+  if(h->dimension_size)  free(h->dimension_size);
+  if(h->dimension_start) free(h->dimension_start);
+  if(h->dimension_step)  free(h->dimension_step);
+  if(h->file_dims)       free(h->file_dims);
+  if(h->apparent_dims)   free(h->apparent_dims);
+  if(h->store_dims)      free(h->store_dims);
+  if(h->representation_dims)free(h->representation_dims);
+  
   h->dimension_name    = NULL;
   h->dimension_size    = NULL;
   h->dimension_start   = NULL;
   h->dimension_step    = NULL;
   h->file_dims         = NULL;
   h->apparent_dims     = NULL;
+  h->store_dims        = NULL;
+  h->representation_dims=NULL;
+  h->using_apparent_order=0;
+  
   return MINC2_SUCCESS;
 }
 
@@ -425,12 +535,14 @@ static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims)
 
   h->ndims=nDims;
 
-  h->dimension_name  = (char**)calloc(h->ndims,sizeof(char*));
-  h->dimension_size  = calloc(h->ndims,sizeof(misize_t));
-  h->dimension_start = calloc(h->ndims,sizeof(double));
-  h->dimension_step  = calloc(h->ndims,sizeof(double));
-  h->file_dims       = calloc(h->ndims,sizeof(midimhandle_t));
-  h->apparent_dims   = calloc(h->ndims,sizeof(midimhandle_t));
+  h->dimension_name  = (char**)         calloc(h->ndims,sizeof(char*));
+  h->dimension_size  = (misize_t*)      calloc(h->ndims,sizeof(misize_t));
+  h->dimension_start = (double*)        calloc(h->ndims,sizeof(double));
+  h->dimension_step  = (double*)        calloc(h->ndims,sizeof(double));
+  h->file_dims       = (midimhandle_t*) calloc(h->ndims,sizeof(midimhandle_t));
+  h->apparent_dims   = (midimhandle_t*) calloc(h->ndims,sizeof(midimhandle_t));
+  h->store_dims      = (struct minc2_dimension*)calloc(h->ndims+1,sizeof(struct minc2_dimension));
+  h->representation_dims= (struct minc2_dimension*)calloc(h->ndims+1,sizeof(struct minc2_dimension));
 
   for (i = 0; i < 5; i++ )
   {
@@ -439,5 +551,53 @@ static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims)
   /*TODO: check if memory was allocated?*/
   
   return MINC2_SUCCESS;
-
 }
+
+const char * minc2_data_type_name(int minc2_type_id)
+{
+  switch(minc2_type_id )
+    {
+    case MINC2_UBYTE:
+      return "unsigned char";
+    case MINC2_BYTE:
+      return "char";
+    case MINC2_USHORT:
+      return "unsigned short";
+    case MINC2_SHORT:
+      return "short";
+    case MINC2_UINT:
+      return "unsigned int";
+    case MINC2_INT:
+      return "int";
+    case MINC2_FLOAT:
+      return "float";
+    case MINC2_DOUBLE:
+      return "double";
+    default:
+      return "Unknown";
+  }
+}
+
+const char * minc2_dim_type_name(int minc2_dim_id)
+{
+  switch(minc2_dim_id)
+  {
+    case MINC2_DIM_X:
+      return "X";
+    case MINC2_DIM_Y:
+      return "Y";
+    case MINC2_DIM_Z:
+      return "Z";
+    case MINC2_DIM_TIME:
+      return "Time";
+    case MINC2_DIM_VEC:
+      return "Vector";
+    case MINC2_DIM_UNKNOWN:
+    case MINC2_DIM_END:
+    default:
+      return "Unknown";
+  }
+}
+
+
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */
