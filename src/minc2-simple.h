@@ -89,6 +89,11 @@ int minc2_free(minc2_file_handle h);
 int minc2_open(minc2_file_handle h,const char * path);
 
 /**
+ * define a new minc2 volume, using provided storage dimension information and storage data type
+ */
+int minc2_define(minc2_file_handle h,struct minc2_dimension *store_dims, int store_data_type);
+
+/**
  * create a new file, owerwriting an existing one if needed
  */
 int minc2_create(minc2_file_handle h,const char * path);

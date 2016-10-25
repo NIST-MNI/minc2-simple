@@ -332,7 +332,7 @@ int minc2_setup_standard_order(minc2_file_handle h)
   }
 
   /*Set apparent dimension order to the MINC2 api*/
-  if(miset_apparent_dimension_order(h->vol,usable_dimensions,h->apparent_dims)<0)
+  if(miset_apparent_dimension_order(h->vol, usable_dimensions, h->apparent_dims)<0)
     return MINC2_ERROR;  
   
   h->using_apparent_order=1;
@@ -347,12 +347,13 @@ int minc2_close(minc2_file_handle h)
     if ( miclose_volume(h->vol) < 0 )
       return MINC2_ERROR;
     
+    h->vol=0;
+    
     return _minc2_cleanup_dimensions(h);
   } else {
     /*File was not open?*/
-    return MINC2_ERROR;
+    return _minc2_cleanup_dimensions(h);
   }
-  
 }
 
 int minc2_ndim(minc2_file_handle h,int *ndim)
@@ -473,7 +474,6 @@ int minc2_storage_data_type(minc2_file_handle h,int *_type)
   }
 }
 
-
 int minc2_get_representation_dimensions(minc2_file_handle h,struct minc2_dimension **dims)
 {
   if(!h->representation_dims)
@@ -490,6 +490,71 @@ int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims
   return MINC2_SUCCESS;
 }
 
+
+int minc2_define(minc2_file_handle h,struct minc2_dimension *store_dims, int store_data_type)
+{
+  int i;
+  int ndims=0;
+  struct minc2_dimension * dim;
+  /*figure out number of dimension*/
+  for(dim=store_dims;dim->id!=MINC2_DIM_END;dim++)
+  {
+    ndims++;
+  }
+  _minc2_allocate_dimensions(h,ndims);
+  memmove(h->store_dims,store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
+  memmove(h->representation_dims,store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
+  
+  for(dim=store_dims,i=0;dim->id!=MINC2_DIM_END;dim++,i++)
+  {
+    switch(dim->id)
+    {
+    case MINC2_DIM_X:
+      micreate_dimension(MIxspace,MI_DIMCLASS_SPATIAL, 
+                         dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
+                         dim->length,
+                         &h->file_dims[ndims-i-1] );
+      h->dimension_indeces[1]=ndims-i-1;
+      break;
+    case MINC2_DIM_Y:
+      micreate_dimension(MIyspace,MI_DIMCLASS_SPATIAL, 
+                         dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
+                         dim->length,
+                         &h->file_dims[ndims-i-1] );
+      h->dimension_indeces[2]=ndims-i-1;
+      break;
+    case MINC2_DIM_Z:
+      micreate_dimension(MIzspace,MI_DIMCLASS_SPATIAL, 
+                         dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
+                         dim->length,
+                         &h->file_dims[ndims-i-1] );
+      h->dimension_indeces[3]=ndims-i-1;
+      break;
+    case MINC2_DIM_TIME:
+      micreate_dimension(MItime, MI_DIMCLASS_TIME, 
+                         dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
+                         dim->length,
+                         &h->file_dims[ndims-i-1] );
+      h->dimension_indeces[4]=ndims-i-1;
+      break;
+    case MINC2_DIM_VEC:
+      micreate_dimension(MIvector_dimension,MI_DIMCLASS_RECORD, MI_DIMATTR_REGULARLY_SAMPLED, 
+                         dim->length,
+                         &h->file_dims[ndims-i-1] );
+      h->dimension_indeces[0]=ndims-i-1;
+      break;
+    default:
+      /*don't know this dimension type*/
+      /*TODO: report error*/
+      break;
+    }
+    miset_dimension_start(h->file_dims[ndims-i-1],dim->start);
+    miset_dimension_separation(h->file_dims[ndims-i-1],dim->step );
+    if(dim->have_dir_cos)
+      miset_dimension_cosines(h->file_dims[ndims-i-1],dim->dir_cos);
+  }
+  return MINC2_SUCCESS;
+}
 
 
 static int _minc2_cleanup_dimensions(minc2_file_handle h)
