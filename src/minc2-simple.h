@@ -91,7 +91,7 @@ int minc2_open(minc2_file_handle h,const char * path);
 /**
  * define a new minc2 volume, using provided storage dimension information and storage data type
  */
-int minc2_define(minc2_file_handle h,struct minc2_dimension *store_dims, int store_data_type);
+int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int store_data_type,int data_type);
 
 /**
  * create a new file, owerwriting an existing one if needed
@@ -150,6 +150,12 @@ int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims
  * Load complete volume into memory
  */
 int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representation_type);
+
+/**
+ * Save complete volume into memory
+ */
+int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type);
+
 
 /**
  * return human-readable type name

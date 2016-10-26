@@ -1,10 +1,11 @@
 #include "minc2.h"
+#include "minc_config.h"
 
 #include "minc2-simple.h"
 #include <stdlib.h>
 #include <string.h>
 #include <string.h>
-
+#include <limits.h>
 /**
  * internal functions
  */
@@ -16,17 +17,16 @@ static int _minc2_cleanup_dimensions(minc2_file_handle h);
  */
 struct minc2_file {
   mihandle_t vol;
-  
+
   int            ndims;
-  mitype_t       store_type;/*how data is stored in minc2 file*/
-  int            data_type; /*how data should be interpreted*/
-  
+  mitype_t       store_type;  /*how data is stored in minc2 file*/
+  int            data_type;   /*how data should be interpreted*/
+
   char         **dimension_name;
   misize_t      *dimension_size;
   double        *dimension_start;
   double        *dimension_step;
-  int            dimension_indeces[5];
-  
+
   struct         minc2_dimension *store_dims;
   struct         minc2_dimension *representation_dims;
  
@@ -65,6 +65,7 @@ int minc2_open(minc2_file_handle h, const char * path)
 {
   /*voxel valid range*/
   double valid_min,valid_max;
+  
   /*real volume range, only awailable when slice scaling is off*/
   double volume_min=0.0,volume_max=1.0;
   int spatial_dimension_count=0;
@@ -144,30 +145,25 @@ int minc2_open(minc2_file_handle h, const char * path)
     if(!strcmp(name,MIxspace) || !strcmp(name,MIxfrequency) ) /*this is X space*/
     {
       h->store_dims[h->ndims-i-1].id=MINC2_DIM_X;
-      h->dimension_indeces[1]=i;
     }
     else if(!strcmp(name,MIyspace) || !strcmp(name,MIyfrequency) ) /*this is Y
                                                                       space */
     {
       h->store_dims[h->ndims-i-1].id=MINC2_DIM_Y;
-      h->dimension_indeces[2]=i;
     }
     else if(!strcmp(name,MIzspace) || !strcmp(name,MIzfrequency) ) /*this is Z
                                                                     space*/
     {
       h->store_dims[h->ndims-i-1].id=MINC2_DIM_Z;
-      h->dimension_indeces[3]=i;
     }
     else if(!strcmp(name,MIvector_dimension) ) /*this is vector space*/
     {
       h->store_dims[h->ndims-i-1].id=MINC2_DIM_VEC;
-      h->dimension_indeces[0]=i;
     }
     else if(!strcmp(name,MItime) || !strcmp(name,MItfrequency) ) /*this is time
                                                                    space */
     {
       h->store_dims[h->ndims-i-1].id=MINC2_DIM_TIME;
-      h->dimension_indeces[4]=i;
     }
     else
     {
@@ -280,9 +276,10 @@ int minc2_open(minc2_file_handle h, const char * path)
 
 int minc2_setup_standard_order(minc2_file_handle h)
 {
-  int spatial_dimension=0;
+  /*int spatial_dimension=0;*/
   int usable_dimensions=0;
   int i;
+  int dimension_indeces[5]={-1, -1, -1, -1, -1};
   
   if(!h->store_dims)
   {
@@ -290,53 +287,60 @@ int minc2_setup_standard_order(minc2_file_handle h)
     return MINC2_ERROR;
   }
   
-  /*minc api uses inverse order of dimensions , fastest varying are last*/
-  if(h->dimension_indeces[4]!=-1) /* have time dimension*/
+  /*create mapping*/
+  for(i=0; i< h->ndims; i++)
   {
-    h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[4]];
-    /*always use positive*/
-    miset_dimension_apparent_voxel_order(h->apparent_dims[usable_dimensions],MI_POSITIVE);
-    
-    h->representation_dims[h->ndims-1-usable_dimensions]=h->store_dims[h->ndims-1-h->dimension_indeces[4]];
-    miget_dimension_separation(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].step);
-    miget_dimension_start(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].start);
-    
-    usable_dimensions++;
-  }
-    
-  for(i=3; i>0; i--)
-  {
-    if(h->dimension_indeces[i]!=-1)
+    switch(h->store_dims[i].id)
     {
-      h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[i]];
-      /*always use positive*/
-      miset_dimension_apparent_voxel_order(h->apparent_dims[usable_dimensions],MI_POSITIVE);
+      case MINC2_DIM_X:
+        dimension_indeces[1]=i;
+        break;
+      case MINC2_DIM_Y:
+        dimension_indeces[2]=i;
+        break;
+      case MINC2_DIM_Z:
+        dimension_indeces[3]=i;
+        break;
+      case MINC2_DIM_VEC:
+        dimension_indeces[0]=i;
+        break;
+      case MINC2_DIM_TIME:
+        dimension_indeces[4]=i;
+        break;
+      default:
+        /*error?*/
+        MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported dimension");
+        break;
+    }
+  }
+  
+  /*remap dimensions*/
+  for(i=0; i<5; i++)
+  {
+    if( dimension_indeces[i]!=-1 )
+    {
+      h->apparent_dims[h->ndims-1-usable_dimensions]=h->file_dims[h->ndims-1-dimension_indeces[i]];
       
-      h->representation_dims[h->ndims-1-usable_dimensions]=h->store_dims[h->ndims-1-h->dimension_indeces[i]];
-      miget_dimension_separation(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].step);
-      miget_dimension_start(h->apparent_dims[usable_dimensions],MI_POSITIVE,&h->representation_dims[h->ndims-1-usable_dimensions].start);
+      /*always use positive, unless it is a vector dimension?*/
+      if(i>0)
+        miset_dimension_apparent_voxel_order(h->apparent_dims[h->ndims-1-usable_dimensions],MI_POSITIVE);
       
-      spatial_dimension++;
+      h->representation_dims[usable_dimensions] = h->store_dims[dimension_indeces[i]];
+      
+      miget_dimension_separation(h->apparent_dims[h->ndims-1-usable_dimensions],MI_POSITIVE,&h->representation_dims[usable_dimensions].step);
+      miget_dimension_start(     h->apparent_dims[h->ndims-1-usable_dimensions],MI_POSITIVE,&h->representation_dims[usable_dimensions].start);
+      
+      /*
+      if(i>0 && i<4)
+        spatial_dimension++;
+      */
       usable_dimensions++;
     }
   }
-
-  if(h->dimension_indeces[0]!=-1) /* have vector dimension*/
-  {
-    h->apparent_dims[usable_dimensions]=h->file_dims[h->dimension_indeces[0]];
-    /*should i set positive voxel order too, just in case?*/
-    
-    h->representation_dims[h->ndims-1-usable_dimensions]=h->store_dims[h->ndims-1-h->dimension_indeces[0]];
-    
-    usable_dimensions++;
-  }
-
   /*Set apparent dimension order to the MINC2 api*/
   if(miset_apparent_dimension_order(h->vol, usable_dimensions, h->apparent_dims)<0)
     return MINC2_ERROR;  
-  
   h->using_apparent_order=1;
-    
   return MINC2_SUCCESS;
 }
 
@@ -449,6 +453,140 @@ int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representat
   return err;
 }
 
+#define \
+_GET_BUFFER_MIN_MAX(type_out,buffer,buffer_length,buffer_min,buffer_max) \
+  { \
+    size_t _i;\
+    const type_out *_buffer = (const type_out *)buffer; \
+    buffer_min=buffer_max=_buffer[0]; \
+    for(_i=0;_i<buffer_length;_i++,_buffer++)\
+    {\
+      if( *_buffer > buffer_max ) buffer_max=*_buffer; \
+      if( *_buffer < buffer_min ) buffer_min=*_buffer; \
+    }\
+  }
+
+
+int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type)
+{
+  mitype_t buffer_type=MI_TYPE_UBYTE;
+  int usable_dimensions=0;
+  int i;
+  int err=MINC2_SUCCESS;
+  size_t buffer_length=1;
+  double   buffer_min,buffer_max;
+  
+  misize_t *start=(misize_t *)calloc(h->ndims,sizeof(misize_t));
+  misize_t *count=(misize_t *)calloc(h->ndims,sizeof(misize_t));
+
+  if(h->using_apparent_order)
+  {
+    /*need to specify dimensions in apparent order, with minc2 convention that fasted dimensions are last*/
+    for ( i = 0; i < h->ndims ; i++ )
+    {
+      start[i]=0;
+      count[i]=h->representation_dims[h->ndims-i-1].length;
+      buffer_length*=count[i];
+    }
+  } else {
+    /*will read information on file order*/
+    for ( i = 0; i < h->ndims ; i++ )
+    {
+      start[i]=0;
+      count[i]=h->store_dims[h->ndims-i-1].length;;
+      buffer_length*=count[i];
+    }
+  }
+  
+  switch(representation_type )
+  {
+    case MINC2_UBYTE:
+      buffer_type=MI_TYPE_UBYTE;
+      _GET_BUFFER_MIN_MAX(unsigned char,buffer,buffer_length,buffer_min,buffer_max);
+      break;
+    case MINC2_BYTE:
+      buffer_type=MI_TYPE_BYTE;
+      _GET_BUFFER_MIN_MAX(char,buffer, buffer_length,buffer_min,buffer_max);
+      break;
+    case MINC2_USHORT:
+      buffer_type=MI_TYPE_USHORT;
+      _GET_BUFFER_MIN_MAX(unsigned short,buffer,buffer_length,buffer_min,buffer_max);
+      break;
+    case MINC2_SHORT:
+      buffer_type=MI_TYPE_SHORT;
+      _GET_BUFFER_MIN_MAX(short,buffer,buffer_length,buffer_min,buffer_max);
+      break;
+    case MINC2_UINT:
+      buffer_type=MI_TYPE_UINT;
+      _GET_BUFFER_MIN_MAX(unsigned int,buffer,buffer_length,buffer_min,buffer_max);
+      break;
+    case MINC2_INT:
+      buffer_type=MI_TYPE_INT;
+      _GET_BUFFER_MIN_MAX(int,buffer,buffer_length,buffer_min,buffer_max);
+      break;
+    case MINC2_FLOAT:
+      buffer_type=MI_TYPE_FLOAT;
+      _GET_BUFFER_MIN_MAX(float,buffer,buffer_length,buffer_min,buffer_max);
+      break;
+    case MINC2_DOUBLE:
+      buffer_type=MI_TYPE_DOUBLE;
+      _GET_BUFFER_MIN_MAX(double,buffer,buffer_length,buffer_min,buffer_max);
+      break;
+    default:
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
+      free( start ); 
+      free( count );
+      return MINC2_ERROR;
+  }
+  
+  if( ! h->global_scaling_flag )/*h->store_type == buffer_type*/
+  {
+    miset_volume_valid_range(h->vol,buffer_max,buffer_min);
+    miset_volume_range(h->vol,buffer_max,buffer_min);
+  }
+  else // we are using scaling
+  {
+    switch(h->store_type)
+    {
+      case MI_TYPE_BYTE:
+        miset_volume_valid_range(h->vol,SCHAR_MAX,SCHAR_MIN);
+        break;
+      case MI_TYPE_UBYTE:
+        miset_volume_valid_range(h->vol,UCHAR_MAX,0);
+        break;
+      case MI_TYPE_SHORT:
+        miset_volume_valid_range(h->vol,SHRT_MAX,SHRT_MIN);
+        break;
+      case MI_TYPE_USHORT:
+        miset_volume_valid_range(h->vol,USHRT_MAX,0);
+        break;
+      case MI_TYPE_INT:
+        miset_volume_valid_range(h->vol,INT_MAX,INT_MIN);
+        break;
+      case MI_TYPE_UINT:
+        miset_volume_valid_range(h->vol,UINT_MAX,0);
+        break;
+      default:
+        /*error*/
+        MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported store data type");
+        free( start ); 
+        free( count );
+        return MINC2_ERROR;
+    }
+    
+    miset_volume_range(h->vol,buffer_max,buffer_min);
+  }
+
+  if ( miset_real_value_hyperslab(h->vol, buffer_type, start, count, (void*)buffer ) < 0 )
+    err=MINC2_ERROR;
+  else
+    err=MINC2_SUCCESS;
+  
+  free( start ); 
+  free( count );
+  return err;  
+}
+
 
 int minc2_data_type(minc2_file_handle h,int *_type)
 {
@@ -491,7 +629,7 @@ int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims
 }
 
 
-int minc2_define(minc2_file_handle h,struct minc2_dimension *store_dims, int store_data_type)
+int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int store_data_type,int data_type)
 {
   int i;
   int ndims=0;
@@ -501,8 +639,31 @@ int minc2_define(minc2_file_handle h,struct minc2_dimension *store_dims, int sto
   {
     ndims++;
   }
+  
+  h->store_type=store_data_type; /*TODO: add mapping?*/
+  h->data_type=data_type;
+  
+  /*TODO: add more cases*/
+  if( ( h->store_type==MI_TYPE_FLOAT ||
+        h->store_type==MI_TYPE_DOUBLE ) || 
+        
+      ( 
+        ( h->store_type==MI_TYPE_BYTE  || h->store_type==MI_TYPE_INT  || h->store_type==MI_TYPE_SHORT ||
+          h->store_type==MI_TYPE_UBYTE || h->store_type==MI_TYPE_UINT || h->store_type==MI_TYPE_USHORT ) && 
+        ( h->data_type==MI_TYPE_BYTE  || h->data_type==MI_TYPE_INT  || h->data_type==MI_TYPE_SHORT ||
+          h->data_type==MI_TYPE_UBYTE || h->data_type==MI_TYPE_UINT || h->data_type==MI_TYPE_USHORT )
+      )
+    )
+  {
+    h->slice_scaling_flag=0;
+    h->global_scaling_flag=0;
+  } else {
+    h->slice_scaling_flag=0; /*TODO: use slice scaling sometimes?*/
+    h->global_scaling_flag=1;
+  }
+  
   _minc2_allocate_dimensions(h,ndims);
-  memmove(h->store_dims,store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
+  memmove(h->store_dims         ,store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
   memmove(h->representation_dims,store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
   
   for(dim=store_dims,i=0;dim->id!=MINC2_DIM_END;dim++,i++)
@@ -514,45 +675,94 @@ int minc2_define(minc2_file_handle h,struct minc2_dimension *store_dims, int sto
                          dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
                          dim->length,
                          &h->file_dims[ndims-i-1] );
-      h->dimension_indeces[1]=ndims-i-1;
       break;
     case MINC2_DIM_Y:
       micreate_dimension(MIyspace,MI_DIMCLASS_SPATIAL, 
                          dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
                          dim->length,
                          &h->file_dims[ndims-i-1] );
-      h->dimension_indeces[2]=ndims-i-1;
       break;
     case MINC2_DIM_Z:
       micreate_dimension(MIzspace,MI_DIMCLASS_SPATIAL, 
                          dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
                          dim->length,
                          &h->file_dims[ndims-i-1] );
-      h->dimension_indeces[3]=ndims-i-1;
       break;
     case MINC2_DIM_TIME:
       micreate_dimension(MItime, MI_DIMCLASS_TIME, 
                          dim->irregular?MI_DIMATTR_NOT_REGULARLY_SAMPLED:MI_DIMATTR_REGULARLY_SAMPLED, 
                          dim->length,
                          &h->file_dims[ndims-i-1] );
-      h->dimension_indeces[4]=ndims-i-1;
       break;
     case MINC2_DIM_VEC:
       micreate_dimension(MIvector_dimension,MI_DIMCLASS_RECORD, MI_DIMATTR_REGULARLY_SAMPLED, 
                          dim->length,
                          &h->file_dims[ndims-i-1] );
-      h->dimension_indeces[0]=ndims-i-1;
       break;
     default:
       /*don't know this dimension type*/
       /*TODO: report error*/
       break;
     }
-    miset_dimension_start(h->file_dims[ndims-i-1],dim->start);
+    miset_dimension_start(     h->file_dims[ndims-i-1],dim->start);
     miset_dimension_separation(h->file_dims[ndims-i-1],dim->step );
     if(dim->have_dir_cos)
-      miset_dimension_cosines(h->file_dims[ndims-i-1],dim->dir_cos);
+      miset_dimension_cosines( h->file_dims[ndims-i-1],dim->dir_cos);
   }
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_create(minc2_file_handle h,const char * path)
+{
+  int i;
+  /**/
+  mivolumeprops_t hprops;
+  
+  if( minew_volume_props(&hprops) < 0)
+  {
+    return MINC2_ERROR;
+  }
+  
+  if(  miget_cfg_present(MICFG_COMPRESS) && miget_cfg_int(MICFG_COMPRESS)>0  )
+  {
+    if(miset_props_compression_type(hprops, MI_COMPRESS_ZLIB)<0)
+    {
+      return MINC2_ERROR;
+    }
+
+    if(miset_props_zlib_compression(hprops,miget_cfg_int(MICFG_COMPRESS))<0)
+    {
+      return MINC2_ERROR;
+    }
+  }
+  else
+  {
+    if(miset_props_compression_type(hprops, MI_COMPRESS_NONE)<0)
+    {
+      return MINC2_ERROR;
+    }
+  }
+
+  if ( micreate_volume ( path, h->ndims, h->file_dims, h->store_type,
+                         MI_CLASS_REAL, hprops, &h->vol )<0 ) /*change MI_CLASS_REAL to something else?*/
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't open file %s",path);
+    return MINC2_ERROR;
+  }
+
+  if (  micreate_volume_image ( h->vol ) <0 )
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't create image in file %s",path);
+    return MINC2_ERROR;
+  }
+
+  if ( miset_slice_scaling_flag(h->vol, h->slice_scaling_flag )<0)
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't set slice scaling");
+    return MINC2_ERROR;
+  }
+  
   return MINC2_SUCCESS;
 }
 
@@ -608,13 +818,7 @@ static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims)
   h->apparent_dims   = (midimhandle_t*) calloc(h->ndims,sizeof(midimhandle_t));
   h->store_dims      = (struct minc2_dimension*)calloc(h->ndims+1,sizeof(struct minc2_dimension));
   h->representation_dims= (struct minc2_dimension*)calloc(h->ndims+1,sizeof(struct minc2_dimension));
-
-  for (i = 0; i < 5; i++ )
-  {
-    h->dimension_indeces[i] = -1;
-  }
   /*TODO: check if memory was allocated?*/
-  
   return MINC2_SUCCESS;
 }
 
