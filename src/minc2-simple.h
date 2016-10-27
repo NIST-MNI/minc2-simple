@@ -193,4 +193,4 @@ const char * minc2_dim_type_name(int minc2_dim_id);
 #endif /*MINC2_SIMPLE_H*/
 
 
-/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c*/

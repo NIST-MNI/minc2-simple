@@ -18,5 +18,9 @@ ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(example)
 
 IF(BUILD_TESTING)
+  find_path(MINC_TOOLKIT_DIR bin/mincstats
+          HINTS /opt/minc )
   ADD_SUBDIRECTORY(test)
 ENDIF(BUILD_TESTING)
+
+#kate: indent-width 2; replace-tabs on; 

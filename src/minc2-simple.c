@@ -572,12 +572,12 @@ int minc2_write_hyperslab(minc2_file_handle h,int *start,int *count,const void* 
     h->tmp_start[i]=start[h->ndims-i-1];
     h->tmp_count[i]=count[h->ndims-i-1];
   }
-  
+
   if ( miset_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, (void*)buffer ) < 0 )
     err=MINC2_ERROR;
   else
     err=MINC2_SUCCESS;
-  
+
   return err;
 }
 
@@ -586,19 +586,19 @@ int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,void* buffer,
   mitype_t buffer_type=_minc2_type_to_mitype(representation_type);
   int i;
   int err=MINC2_SUCCESS;
-  
+
   /*need to specify dimensions with minc2 convention that fasted dimensions are last*/
   for ( i = 0; i < h->ndims ; i++ )
   {
     h->tmp_start[i]=start[h->ndims-i-1];
     h->tmp_count[i]=count[h->ndims-i-1];
   }
-  
+
   if ( miget_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, buffer) < 0 )
     err=MINC2_ERROR;
   else
     err=MINC2_SUCCESS;
-  
+
   return err;
 }
 
@@ -664,8 +664,8 @@ int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int st
       ( 
         ( h->store_type==MI_TYPE_BYTE  || h->store_type==MI_TYPE_INT  || h->store_type==MI_TYPE_SHORT ||
           h->store_type==MI_TYPE_UBYTE || h->store_type==MI_TYPE_UINT || h->store_type==MI_TYPE_USHORT ) && 
-        ( h->data_type==MI_TYPE_BYTE  || h->data_type==MI_TYPE_INT  || h->data_type==MI_TYPE_SHORT ||
-          h->data_type==MI_TYPE_UBYTE || h->data_type==MI_TYPE_UINT || h->data_type==MI_TYPE_USHORT )
+        ( h->data_type==MI_TYPE_BYTE   || h->data_type==MI_TYPE_INT   || h->data_type==MI_TYPE_SHORT ||
+          h->data_type==MI_TYPE_UBYTE  || h->data_type==MI_TYPE_UINT  || h->data_type==MI_TYPE_USHORT )
       )
     )
   {
@@ -940,4 +940,4 @@ static int _mitype_to_minc2_type(mitype_t t)
 
 
 
-/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */
