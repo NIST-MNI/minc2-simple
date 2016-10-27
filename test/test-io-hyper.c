@@ -118,6 +118,8 @@ int main(int argc,char **argv)
       int *_start=(int*)calloc(ndim,sizeof(int));
       int *_count=(int*)calloc(ndim,sizeof(int));
       
+      /*not going to use any kind of scaling, so no need to setup value range in advance*/
+      minc2_set_scaling(o,0,0);
       minc2_setup_standard_order(o);
       minc2_get_representation_dimensions(o,&repr_dims_o);
       
@@ -170,12 +172,13 @@ int main(int argc,char **argv)
         }
 
         
-      } while(hyperslab_iterate(_start,repr_dims_o,2) && !err);
+      } while( hyperslab_iterate(_start,repr_dims_o,2) && !err);
       
       s_avg/=cnt;
       diff=clock();
       fprintf(stdout,"Avg:%lf min:%lf max:%lf time:%ld msec\n",s_avg,s_min,s_max, (diff * 1000 / CLOCKS_PER_SEC));
-      minc2_set_volume_range(o,s_min,s_max,0);
+      
+      minc2_set_volume_range(o,s_min,s_max);
       
       free(buffer);
     } else {

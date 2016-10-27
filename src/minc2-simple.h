@@ -157,10 +157,22 @@ int minc2_load_complete_volume(minc2_file_handle h,void *buffer,int representati
 int minc2_save_complete_volume(minc2_file_handle h,const void *buffer,int representation_type);
 
 /**
+ * Specify flags to use scaling
+ */
+int minc2_set_scaling(minc2_file_handle h,int use_global_scaling,int use_slice_scaling);
+
+/**
  * Specify volume range, only when using hyperslab writing
  * Implies no slice scaling 
  */
-int minc2_set_volume_range(minc2_file_handle h,double value_min,double value_max,int use_global_scaling);
+int minc2_set_volume_range(minc2_file_handle h,double value_min,double value_max);
+
+/**
+ * Specify slice range, only when using hyperslab writing with slice scaling
+ * Implies no slice scaling
+ */
+int minc2_set_slice_range(minc2_file_handle h,int *start,double value_min,double value_max);
+
 
 /**
  * write hyperslab, using current dimension order

@@ -282,6 +282,20 @@ int minc2_open(minc2_file_handle h, const char * path)
 }
 
 
+int minc2_slice_ndim(minc2_file_handle h,int *slice_ndim)
+{
+  if(h->slice_scaling_flag)
+  {
+    if( miget_slice_dimension_count(h->vol,MI_DIMCLASS_ANY, MI_DIMATTR_ALL,&slice_ndim)<0)
+      return MINC2_ERROR;
+  } else {
+    /*we don't have slice scaling?*/
+    *slice_ndim= (h>ndims>2?2:h>ndims);
+  }
+  return MINC2_SUCCESS;
+}
+
+
 int minc2_setup_standard_order(minc2_file_handle h)
 {
   /*int spatial_dimension=0;*/
@@ -501,7 +515,7 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
       return MINC2_ERROR;
   }
   
-  if(minc2_set_volume_range(h,buffer_min,buffer_max,h->global_scaling_flag)!=MINC2_SUCCESS)
+  if(minc2_set_volume_range(h,buffer_min,buffer_max)!=MINC2_SUCCESS)
     return MINC2_ERROR;
 
   if ( miset_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, (void*)buffer ) < 0 )
@@ -512,21 +526,24 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
   return err;  
 }
 
-int minc2_set_volume_range(minc2_file_handle h,
-                           double value_min,double value_max,
-                           int use_global_scaling)
+int minc2_set_scaling(minc2_file_handle h,int use_global_scaling,int use_slice_scaling)
 {
   int err=MINC2_SUCCESS;
+
+  if(use_global_scaling&&use_slice_scaling)
+    /*can't have it both ways*/
+    return MINC2_ERROR;
+
   h->global_scaling_flag=use_global_scaling;
-  h->slice_scaling_flag=0;
-  
-  if( ! use_global_scaling )
+  h->slice_scaling_flag=use_slice_scaling;
+
+  if ( miset_slice_scaling_flag(h->vol, h->slice_scaling_flag )<0)
   {
-    
-    if(miset_volume_valid_range( h->vol, value_max,value_min)<0) err=MINC2_ERROR;
-    if(miset_volume_range(       h->vol, value_max,value_min)<0) err=MINC2_ERROR;
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't set slice scaling");
+    return MINC2_ERROR;
   }
-  else // we are using scaling
+
+  if(h->global_scaling_flag)
   {
     switch(h->store_type)
     {
@@ -553,10 +570,41 @@ int minc2_set_volume_range(minc2_file_handle h,
         MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported store data type");
         return MINC2_ERROR;
     }
+  }
+  return err;
+}
+
+
+int minc2_set_volume_range(minc2_file_handle h,
+                           double value_min,
+                           double value_max)
+{
+  int err=MINC2_SUCCESS;
+  
+  if( !h->global_scaling_flag )
+  {
     
+    if(miset_volume_valid_range( h->vol, value_max, value_min)<0) err=MINC2_ERROR;
+    if(miset_volume_range(       h->vol, value_max, value_min)<0) err=MINC2_ERROR;
+  }
+  else // we are using scaling
+  {
     if(miset_volume_range(h->vol,value_max,value_min)<0) err=MINC2_ERROR;
   }
   return err;
+}
+
+int minc2_set_slice_range(minc2_file_handle h,int *start,double value_min,double value_max)
+{
+  int i;
+  for ( i = 0; i < h->ndims ; i++ )
+  {
+    h->tmp_start[i]=start[h->ndims-i-1];
+  }
+  if( miset_slice_range(h->vol,h->tmp_start,(size_t)h->ndims,value_min,value_max) < 0)
+    return MINC2_ERROR;
+
+  return MINC2_SUCCESS;
 }
 
 
@@ -738,7 +786,8 @@ int minc2_create(minc2_file_handle h,const char * path)
     return MINC2_ERROR;
   }
   
-  if(  miget_cfg_present(MICFG_COMPRESS) && miget_cfg_int(MICFG_COMPRESS)>0  )
+  /*TODO: move it to volume definition*/
+  if(miget_cfg_present(MICFG_COMPRESS) && miget_cfg_int(MICFG_COMPRESS)>0  )
   {
     if(miset_props_compression_type(hprops, MI_COMPRESS_ZLIB)<0)
     {
@@ -771,11 +820,11 @@ int minc2_create(minc2_file_handle h,const char * path)
     return MINC2_ERROR;
   }
 
-  if ( miset_slice_scaling_flag(h->vol, h->slice_scaling_flag )<0)
+  /*if ( miset_slice_scaling_flag(h->vol, h->slice_scaling_flag )<0)
   {
     MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't set slice scaling");
     return MINC2_ERROR;
-  }
+  }*/
   
   return MINC2_SUCCESS;
 }
