@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C" {               /* Hey, Mr. Compiler - this is "C" code! */
 #endif /* __cplusplus defined */
-  
+ 
 
 /**
   * minc2 dimension types
@@ -149,13 +149,30 @@ int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims
 /**
  * Load complete volume into memory
  */
-int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representation_type);
+int minc2_load_complete_volume(minc2_file_handle h,void *buffer,int representation_type);
 
 /**
  * Save complete volume into memory
  */
-int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type);
+int minc2_save_complete_volume(minc2_file_handle h,const void *buffer,int representation_type);
 
+/**
+ * Specify volume range, only when using hyperslab writing
+ * Implies no slice scaling 
+ */
+int minc2_set_volume_range(minc2_file_handle h,double value_min,double value_max,int use_global_scaling);
+
+/**
+ * write hyperslab, using current dimension order
+ * WARNING: no range checks performed!
+ */
+int minc2_write_hyperslab(minc2_file_handle h,int *start,int *count,const void* buffer,int representation_type);
+
+/**
+ * read hyperslab, using current dimension order
+ * WARNING: no range checks performed!
+ */
+int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,const void* buffer,int representation_type);
 
 /**
  * return human-readable type name

@@ -37,6 +37,10 @@ struct minc2_file {
   miboolean_t    global_scaling_flag;
   
   miboolean_t    using_apparent_order;
+  
+  /*internal temporary data*/
+  misize_t      *tmp_start;
+  misize_t      *tmp_count;
 };
 
 /**
@@ -390,26 +394,24 @@ int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representat
   int usable_dimensions=0;
   int i;
   int err=MINC2_SUCCESS;
-  misize_t *start=(misize_t *)calloc(h->ndims,sizeof(misize_t));
-  misize_t *count=(misize_t *)calloc(h->ndims,sizeof(misize_t));
 
   if(h->using_apparent_order)
   {
     /*need to specify dimensions in apparent order, with minc2 convention that fasted dimensions are last*/
     for ( i = 0; i < h->ndims ; i++ )
     {
-      start[i]=0;
-      count[i]=h->representation_dims[h->ndims-i-1].length;
+      h->tmp_start[i]=0;
+      h->tmp_count[i]=h->representation_dims[h->ndims-i-1].length;
     }
   } else {
     /*will read information on file order*/
     for ( i = 0; i < h->ndims ; i++ )
     {
-      start[i]=0;
-      count[i]=h->store_dims[h->ndims-i-1].length;;
+      h->tmp_start[i]=0;
+      h->tmp_count[i]=h->store_dims[h->ndims-i-1].length;;
     }
   }
-  
+  buffer_type=
   switch(representation_type )
   {
     case MINC2_UBYTE:
@@ -438,18 +440,14 @@ int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representat
       break;
     default:
       MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
-      free( start ); 
-      free( count );
       return MINC2_ERROR;
   }
 
-  if ( miget_real_value_hyperslab(h->vol, buffer_type, start, count, buffer) < 0 )
+  if ( miget_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, buffer) < 0 )
     err=MINC2_ERROR;
   else
     err=MINC2_SUCCESS;
   
-  free( start ); 
-  free( count );
   return err;
 }
 
@@ -470,31 +468,27 @@ _GET_BUFFER_MIN_MAX(type_out,buffer,buffer_length,buffer_min,buffer_max) \
 int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type)
 {
   mitype_t buffer_type=MI_TYPE_UBYTE;
-  int usable_dimensions=0;
   int i;
   int err=MINC2_SUCCESS;
-  size_t buffer_length=1;
+  size_t   buffer_length=1;
   double   buffer_min,buffer_max;
   
-  misize_t *start=(misize_t *)calloc(h->ndims,sizeof(misize_t));
-  misize_t *count=(misize_t *)calloc(h->ndims,sizeof(misize_t));
-
   if(h->using_apparent_order)
   {
     /*need to specify dimensions in apparent order, with minc2 convention that fasted dimensions are last*/
     for ( i = 0; i < h->ndims ; i++ )
     {
-      start[i]=0;
-      count[i]=h->representation_dims[h->ndims-i-1].length;
-      buffer_length*=count[i];
+      h->tmp_start[i]=0;
+      h->tmp_count[i]=h->representation_dims[h->ndims-i-1].length;
+      buffer_length*=h->tmp_count[i];
     }
   } else {
-    /*will read information on file order*/
+    /*will write information in file order*/
     for ( i = 0; i < h->ndims ; i++ )
     {
-      start[i]=0;
-      count[i]=h->store_dims[h->ndims-i-1].length;;
-      buffer_length*=count[i];
+      h->tmp_start[i]=0;
+      h->tmp_count[i]=h->store_dims[h->ndims-i-1].length;;
+      buffer_length*=h->tmp_count[i];
     }
   }
   
@@ -534,58 +528,88 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
       break;
     default:
       MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
-      free( start ); 
-      free( count );
       return MINC2_ERROR;
   }
   
-  if( ! h->global_scaling_flag )/*h->store_type == buffer_type*/
+  minc2_set_volume_range(h,buffer_min,buffer_max,h->global_scaling_flag);
+  
+
+  if ( miset_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, (void*)buffer ) < 0 )
+    err=MINC2_ERROR;
+  else
+    err=MINC2_SUCCESS;
+  
+  return err;  
+}
+
+int minc2_set_volume_range(minc2_file_handle h,
+                           double value_min,double value_max,
+                           int use_global_scaling)
+{
+  int err=MINC2_SUCCESS;
+  h->global_scaling_flag=use_global_scaling;
+  h->slice_scaling_flag=0;
+  
+  if( ! use_global_scaling )
   {
-    miset_volume_valid_range(h->vol,buffer_max,buffer_min);
-    miset_volume_range(h->vol,buffer_max,buffer_min);
+    
+    if(miset_volume_valid_range( h->vol, value_max,value_min)<0) err=MINC2_ERROR;
+    if(miset_volume_range(       h->vol, value_max,value_min)<0) err=MINC2_ERROR;
   }
   else // we are using scaling
   {
     switch(h->store_type)
     {
       case MI_TYPE_BYTE:
-        miset_volume_valid_range(h->vol,SCHAR_MAX,SCHAR_MIN);
+        if(miset_volume_valid_range(h->vol,SCHAR_MAX,SCHAR_MIN)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_UBYTE:
-        miset_volume_valid_range(h->vol,UCHAR_MAX,0);
+        if(miset_volume_valid_range(h->vol,UCHAR_MAX,0)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_SHORT:
-        miset_volume_valid_range(h->vol,SHRT_MAX,SHRT_MIN);
+        if(miset_volume_valid_range(h->vol,SHRT_MAX,SHRT_MIN)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_USHORT:
-        miset_volume_valid_range(h->vol,USHRT_MAX,0);
+        if(miset_volume_valid_range(h->vol,USHRT_MAX,0)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_INT:
-        miset_volume_valid_range(h->vol,INT_MAX,INT_MIN);
+        if(miset_volume_valid_range(h->vol,INT_MAX,INT_MIN)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_UINT:
-        miset_volume_valid_range(h->vol,UINT_MAX,0);
+        if(miset_volume_valid_range(h->vol,UINT_MAX,0)<0) err=MINC2_ERROR;
         break;
       default:
         /*error*/
         MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported store data type");
-        free( start ); 
-        free( count );
         return MINC2_ERROR;
     }
     
-    miset_volume_range(h->vol,buffer_max,buffer_min);
+    if(miset_volume_range(h->vol,value_max,value_min)<0) err=MINC2_ERROR;
   }
-
-  if ( miset_real_value_hyperslab(h->vol, buffer_type, start, count, (void*)buffer ) < 0 )
-    err=MINC2_ERROR;
-  else
-    err=MINC2_SUCCESS;
-  
-  free( start ); 
-  free( count );
-  return err;  
+  return err;
 }
+
+
+
+int minc2_write_hyperslab(minc2_file_handle h,int *start,int *count,const void* buffer,int representation_type)
+{
+  mitype_t buffer_type=MI_TYPE_UBYTE;
+  int i;
+  int err=MINC2_SUCCESS;
+  
+  /*need to specify dimensions with minc2 convention that fasted dimensions are last*/
+  for ( i = 0; i < h->ndims ; i++ )
+  {
+    h->tmp_start[i]=start[h->ndims-i-1];
+    h->tmp_count[i]=count[h->ndims-i-1];
+  }
+  
+}
+
+int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,const void* buffer,int representation_type)
+{
+}
+
 
 
 int minc2_data_type(minc2_file_handle h,int *_type)
@@ -789,6 +813,8 @@ static int _minc2_cleanup_dimensions(minc2_file_handle h)
   if(h->apparent_dims)   free(h->apparent_dims);
   if(h->store_dims)      free(h->store_dims);
   if(h->representation_dims)free(h->representation_dims);
+  if(h->tmp_start)       free(h->tmp_start);
+  if(h->tmp_count)       free(h->tmp_count);
   
   h->dimension_name    = NULL;
   h->dimension_size    = NULL;
@@ -799,6 +825,8 @@ static int _minc2_cleanup_dimensions(minc2_file_handle h)
   h->store_dims        = NULL;
   h->representation_dims=NULL;
   h->using_apparent_order=0;
+  h->tmp_count         =NULL;
+  h->tmp_start         =NULL;
   
   return MINC2_SUCCESS;
 }
@@ -818,6 +846,10 @@ static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims)
   h->apparent_dims   = (midimhandle_t*) calloc(h->ndims,sizeof(midimhandle_t));
   h->store_dims      = (struct minc2_dimension*)calloc(h->ndims+1,sizeof(struct minc2_dimension));
   h->representation_dims= (struct minc2_dimension*)calloc(h->ndims+1,sizeof(struct minc2_dimension));
+
+  h->tmp_start       = (misize_t *)calloc(h->ndims,sizeof(misize_t));
+  h->tmp_count       = (misize_t *)calloc(h->ndims,sizeof(misize_t));
+
   /*TODO: check if memory was allocated?*/
   return MINC2_SUCCESS;
 }
