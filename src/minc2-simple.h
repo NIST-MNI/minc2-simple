@@ -172,7 +172,7 @@ int minc2_write_hyperslab(minc2_file_handle h,int *start,int *count,const void* 
  * read hyperslab, using current dimension order
  * WARNING: no range checks performed!
  */
-int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,const void* buffer,int representation_type);
+int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,void* buffer,int representation_type);
 
 /**
  * return human-readable type name

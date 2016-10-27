@@ -11,6 +11,8 @@
  */
 static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims);
 static int _minc2_cleanup_dimensions(minc2_file_handle h);
+static mitype_t _minc2_type_to_mitype(int minc2_type);
+static int _mitype_to_minc2_type(mitype_t t);
 
 /**
  * internal representation of the minc file
@@ -19,7 +21,7 @@ struct minc2_file {
   mihandle_t vol;
 
   int            ndims;
-  mitype_t       store_type;  /*how data is stored in minc2 file*/
+  int            store_type;  /*how data is stored in minc2 file*/
   int            data_type;   /*how data should be interpreted*/
 
   char         **dimension_name;
@@ -76,7 +78,7 @@ int minc2_open(minc2_file_handle h, const char * path)
   int spatial_dimension=0;
   int usable_dimensions=0;
   miclass_t volume_data_class;
-
+  mitype_t  store_type;
   int i;
   int n_dims;
   
@@ -102,8 +104,10 @@ int minc2_open(minc2_file_handle h, const char * path)
   if ( miget_dimension_starts(h->file_dims, MI_ORDER_FILE, h->ndims, h->dimension_start) < 0 )
     return MINC2_ERROR;
   
-  if ( miget_data_type(h->vol, &h->store_type) < 0 )
+  if ( miget_data_type(h->vol, &store_type) < 0 )
     return MINC2_ERROR;
+  
+  h->store_type=_mitype_to_minc2_type(store_type);
   
   if ( miget_slice_scaling_flag(h->vol, &h->slice_scaling_flag) < 0 )
     return MINC2_ERROR;
@@ -411,37 +415,7 @@ int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representat
       h->tmp_count[i]=h->store_dims[h->ndims-i-1].length;;
     }
   }
-  buffer_type=
-  switch(representation_type )
-  {
-    case MINC2_UBYTE:
-      buffer_type=MI_TYPE_UBYTE;
-      break;
-    case MINC2_BYTE:
-      buffer_type=MI_TYPE_BYTE;
-      break;
-    case MINC2_USHORT:
-      buffer_type=MI_TYPE_USHORT;
-      break;
-    case MINC2_SHORT:
-      buffer_type=MI_TYPE_SHORT;
-      break;
-    case MINC2_UINT:
-      buffer_type=MI_TYPE_UINT;
-      break;
-    case MINC2_INT:
-      buffer_type=MI_TYPE_INT;
-      break;
-    case MINC2_FLOAT:
-      buffer_type=MI_TYPE_FLOAT;
-      break;
-    case MINC2_DOUBLE:
-      buffer_type=MI_TYPE_DOUBLE;
-      break;
-    default:
-      MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
-      return MINC2_ERROR;
-  }
+  buffer_type=_minc2_type_to_mitype(representation_type);
 
   if ( miget_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, buffer) < 0 )
     err=MINC2_ERROR;
@@ -468,6 +442,9 @@ _GET_BUFFER_MIN_MAX(type_out,buffer,buffer_length,buffer_min,buffer_max) \
 int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type)
 {
   mitype_t buffer_type=MI_TYPE_UBYTE;
+  mitype_t file_store_type=MI_TYPE_UBYTE;
+  
+  int usable_dimensions=0;
   int i;
   int err=MINC2_SUCCESS;
   size_t   buffer_length=1;
@@ -492,38 +469,31 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
     }
   }
   
+  buffer_type=_minc2_type_to_mitype(representation_type);
   switch(representation_type )
   {
     case MINC2_UBYTE:
-      buffer_type=MI_TYPE_UBYTE;
       _GET_BUFFER_MIN_MAX(unsigned char,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_BYTE:
-      buffer_type=MI_TYPE_BYTE;
       _GET_BUFFER_MIN_MAX(char,buffer, buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_USHORT:
-      buffer_type=MI_TYPE_USHORT;
       _GET_BUFFER_MIN_MAX(unsigned short,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_SHORT:
-      buffer_type=MI_TYPE_SHORT;
       _GET_BUFFER_MIN_MAX(short,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_UINT:
-      buffer_type=MI_TYPE_UINT;
       _GET_BUFFER_MIN_MAX(unsigned int,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_INT:
-      buffer_type=MI_TYPE_INT;
       _GET_BUFFER_MIN_MAX(int,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_FLOAT:
-      buffer_type=MI_TYPE_FLOAT;
       _GET_BUFFER_MIN_MAX(float,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_DOUBLE:
-      buffer_type=MI_TYPE_DOUBLE;
       _GET_BUFFER_MIN_MAX(double,buffer,buffer_length,buffer_min,buffer_max);
       break;
     default:
@@ -531,8 +501,8 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
       return MINC2_ERROR;
   }
   
-  minc2_set_volume_range(h,buffer_min,buffer_max,h->global_scaling_flag);
-  
+  if(minc2_set_volume_range(h,buffer_min,buffer_max,h->global_scaling_flag)!=MINC2_SUCCESS)
+    return MINC2_ERROR;
 
   if ( miset_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, (void*)buffer ) < 0 )
     err=MINC2_ERROR;
@@ -590,10 +560,9 @@ int minc2_set_volume_range(minc2_file_handle h,
 }
 
 
-
 int minc2_write_hyperslab(minc2_file_handle h,int *start,int *count,const void* buffer,int representation_type)
 {
-  mitype_t buffer_type=MI_TYPE_UBYTE;
+  mitype_t buffer_type=_minc2_type_to_mitype(representation_type);
   int i;
   int err=MINC2_SUCCESS;
   
@@ -604,13 +573,34 @@ int minc2_write_hyperslab(minc2_file_handle h,int *start,int *count,const void* 
     h->tmp_count[i]=count[h->ndims-i-1];
   }
   
+  if ( miset_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, (void*)buffer ) < 0 )
+    err=MINC2_ERROR;
+  else
+    err=MINC2_SUCCESS;
+  
+  return err;
 }
 
-int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,const void* buffer,int representation_type)
+int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,void* buffer,int representation_type)
 {
+  mitype_t buffer_type=_minc2_type_to_mitype(representation_type);
+  int i;
+  int err=MINC2_SUCCESS;
+  
+  /*need to specify dimensions with minc2 convention that fasted dimensions are last*/
+  for ( i = 0; i < h->ndims ; i++ )
+  {
+    h->tmp_start[i]=start[h->ndims-i-1];
+    h->tmp_count[i]=count[h->ndims-i-1];
+  }
+  
+  if ( miget_real_value_hyperslab(h->vol, buffer_type, h->tmp_start, h->tmp_count, buffer) < 0 )
+    err=MINC2_ERROR;
+  else
+    err=MINC2_SUCCESS;
+  
+  return err;
 }
-
-
 
 int minc2_data_type(minc2_file_handle h,int *_type)
 {
@@ -854,6 +844,8 @@ static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims)
   return MINC2_SUCCESS;
 }
 
+
+
 const char * minc2_data_type_name(int minc2_type_id)
 {
   switch(minc2_type_id )
@@ -899,6 +891,53 @@ const char * minc2_dim_type_name(int minc2_dim_id)
       return "Unknown";
   }
 }
+
+static mitype_t _minc2_type_to_mitype(int minc2_type)
+{
+  /*this is identity transform at the moment*/
+  return (mitype_t)minc2_type;
+  /*
+    switch(representation_type )
+  {
+    case MINC2_UBYTE:
+      buffer_type=MI_TYPE_UBYTE;
+      break;
+    case MINC2_BYTE:
+      buffer_type=MI_TYPE_BYTE;
+      break;
+    case MINC2_USHORT:
+      buffer_type=MI_TYPE_USHORT;
+      break;
+    case MINC2_SHORT:
+      buffer_type=MI_TYPE_SHORT;
+      break;
+    case MINC2_UINT:
+      buffer_type=MI_TYPE_UINT;
+      break;
+    case MINC2_INT:
+      buffer_type=MI_TYPE_INT;
+      break;
+    case MINC2_FLOAT:
+      buffer_type=MI_TYPE_FLOAT;
+      break;
+    case MINC2_DOUBLE:
+      buffer_type=MI_TYPE_DOUBLE;
+      break;
+    default:
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
+      free( start ); 
+      free( count );
+      return MINC2_ERROR;
+  }
+   */
+}
+
+static int _mitype_to_minc2_type(mitype_t t)
+{
+  /*this is identity transform at the moment*/
+  return (int)t;
+}
+
 
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; */
