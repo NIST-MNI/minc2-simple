@@ -156,7 +156,6 @@ int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representat
  */
 int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type);
 
-
 /**
  * return human-readable type name
  */

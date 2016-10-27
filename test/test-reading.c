@@ -18,8 +18,6 @@ void print_dimension_info(struct minc2_dimension *dims)
   }
 }
 
-
-
 int main(int argc,char **argv)
 {
   minc2_file_handle h;
@@ -140,7 +138,6 @@ int main(int argc,char **argv)
     fprintf(stderr,"Can't open file %s for reading",argv[1]);
     err++;
   }
-  
   minc2_free(h);
   minc2_free(o);
   return err;
