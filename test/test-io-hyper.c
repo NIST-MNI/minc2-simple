@@ -103,6 +103,9 @@ int main(int argc,char **argv)
 
     /*setup writing*/
     minc2_define(o,store_dims,MINC2_FLOAT,MINC2_FLOAT); /*writing to flaot volume, using float*/
+    
+    /*not going to use any kind of scaling, so no need to setup value range in advance*/
+    minc2_set_scaling(o,0,0);
 
     if(minc2_create(o,argv[2])==MINC2_SUCCESS)
     {
@@ -118,8 +121,6 @@ int main(int argc,char **argv)
       int *_start=(int*)calloc(ndim,sizeof(int));
       int *_count=(int*)calloc(ndim,sizeof(int));
       
-      /*not going to use any kind of scaling, so no need to setup value range in advance*/
-      minc2_set_scaling(o,0,0);
       minc2_setup_standard_order(o);
       minc2_get_representation_dimensions(o,&repr_dims_o);
       

@@ -286,11 +286,11 @@ int minc2_slice_ndim(minc2_file_handle h,int *slice_ndim)
 {
   if(h->slice_scaling_flag)
   {
-    if( miget_slice_dimension_count(h->vol,MI_DIMCLASS_ANY, MI_DIMATTR_ALL,&slice_ndim)<0)
+    if( miget_slice_dimension_count(h->vol,MI_DIMCLASS_ANY, MI_DIMATTR_ALL, slice_ndim)<0)
       return MINC2_ERROR;
   } else {
     /*we don't have slice scaling?*/
-    *slice_ndim= (h>ndims>2?2:h>ndims);
+    *slice_ndim= (h->ndims>2?2:h->ndims);
   }
   return MINC2_SUCCESS;
 }
@@ -537,40 +537,6 @@ int minc2_set_scaling(minc2_file_handle h,int use_global_scaling,int use_slice_s
   h->global_scaling_flag=use_global_scaling;
   h->slice_scaling_flag=use_slice_scaling;
 
-  if ( miset_slice_scaling_flag(h->vol, h->slice_scaling_flag )<0)
-  {
-    MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't set slice scaling");
-    return MINC2_ERROR;
-  }
-
-  if(h->global_scaling_flag)
-  {
-    switch(h->store_type)
-    {
-      case MI_TYPE_BYTE:
-        if(miset_volume_valid_range(h->vol,SCHAR_MAX,SCHAR_MIN)<0) err=MINC2_ERROR;
-        break;
-      case MI_TYPE_UBYTE:
-        if(miset_volume_valid_range(h->vol,UCHAR_MAX,0)<0) err=MINC2_ERROR;
-        break;
-      case MI_TYPE_SHORT:
-        if(miset_volume_valid_range(h->vol,SHRT_MAX,SHRT_MIN)<0) err=MINC2_ERROR;
-        break;
-      case MI_TYPE_USHORT:
-        if(miset_volume_valid_range(h->vol,USHRT_MAX,0)<0) err=MINC2_ERROR;
-        break;
-      case MI_TYPE_INT:
-        if(miset_volume_valid_range(h->vol,INT_MAX,INT_MIN)<0) err=MINC2_ERROR;
-        break;
-      case MI_TYPE_UINT:
-        if(miset_volume_valid_range(h->vol,UINT_MAX,0)<0) err=MINC2_ERROR;
-        break;
-      default:
-        /*error*/
-        MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported store data type");
-        return MINC2_ERROR;
-    }
-  }
   return err;
 }
 
@@ -601,7 +567,7 @@ int minc2_set_slice_range(minc2_file_handle h,int *start,double value_min,double
   {
     h->tmp_start[i]=start[h->ndims-i-1];
   }
-  if( miset_slice_range(h->vol,h->tmp_start,(size_t)h->ndims,value_min,value_max) < 0)
+  if( miset_slice_range(h->vol,h->tmp_start, (size_t)h->ndims, value_min, value_max) < 0)
     return MINC2_ERROR;
 
   return MINC2_SUCCESS;
@@ -778,6 +744,7 @@ int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int st
 int minc2_create(minc2_file_handle h,const char * path)
 {
   int i;
+  int err;
   /**/
   mivolumeprops_t hprops;
   
@@ -807,10 +774,18 @@ int minc2_create(minc2_file_handle h,const char * path)
     }
   }
 
+
   if ( micreate_volume ( path, h->ndims, h->file_dims, h->store_type,
                          MI_CLASS_REAL, hprops, &h->vol )<0 ) /*change MI_CLASS_REAL to something else?*/
   {
     MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't open file %s",path);
+    return MINC2_ERROR;
+  }
+
+  /*have to set slice scaling flag before image is allocated*/
+  if ( miset_slice_scaling_flag(h->vol, h->slice_scaling_flag )<0 )
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't set slice scaling");
     return MINC2_ERROR;
   }
 
@@ -820,12 +795,59 @@ int minc2_create(minc2_file_handle h,const char * path)
     return MINC2_ERROR;
   }
 
-  /*if ( miset_slice_scaling_flag(h->vol, h->slice_scaling_flag )<0)
+  if(h->global_scaling_flag)
   {
-    MI_LOG_ERROR(MI2_MSG_GENERIC,"Couldn't set slice scaling");
+    switch(h->store_type)
+    {
+      case MI_TYPE_BYTE:
+        if(miset_volume_valid_range(h->vol,SCHAR_MAX,SCHAR_MIN)<0) err=MINC2_ERROR;
+        break;
+      case MI_TYPE_UBYTE:
+        if(miset_volume_valid_range(h->vol,UCHAR_MAX,0)<0) err=MINC2_ERROR;
+        break;
+      case MI_TYPE_SHORT:
+        if(miset_volume_valid_range(h->vol,SHRT_MAX,SHRT_MIN)<0) err=MINC2_ERROR;
+        break;
+      case MI_TYPE_USHORT:
+        if(miset_volume_valid_range(h->vol,USHRT_MAX,0)<0) err=MINC2_ERROR;
+        break;
+      case MI_TYPE_INT:
+        if(miset_volume_valid_range(h->vol,INT_MAX,INT_MIN)<0) err=MINC2_ERROR;
+        break;
+      case MI_TYPE_UINT:
+        if(miset_volume_valid_range(h->vol,UINT_MAX,0)<0) err=MINC2_ERROR;
+        break;
+      default:
+        /*error*/
+        MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported store data type");
+        return MINC2_ERROR;
+    }
+  }
+
+  return err;
+}
+
+
+int minc2_world_to_voxel(minc2_file_handle h,const double *world,double *voxel)
+{
+  if(!h->vol)
+    MINC2_ERROR;
+
+  if(miconvert_world_to_voxel(h->vol,world,voxel)<0)
     return MINC2_ERROR;
-  }*/
-  
+
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_voxel_to_world(minc2_file_handle h,const double *voxel,double *world)
+{
+  if(!h->vol)
+    MINC2_ERROR;
+
+  if(miconvert_voxel_to_world(h->vol,voxel,world)<0)
+    return MINC2_ERROR;
+
   return MINC2_SUCCESS;
 }
 
@@ -893,6 +915,31 @@ static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims)
   return MINC2_SUCCESS;
 }
 
+int minc2_copy_metadata(minc2_file_handle src,minc2_file_handle dst)
+{
+  milisthandle_t grplist;
+  int err=0;
+  if( !src->vol || !dst->vol)
+    return MINC2_ERROR;
+
+  if ( (milist_start(src->vol, "", 0, &grplist) ) == MI_NOERROR )
+  {
+      char           group_name[256];
+      milisthandle_t attlist;
+      while( milist_grp_next(grplist, group_name, sizeof(group_name) ) == MI_NOERROR )
+      {
+        if(micopy_attr(src->vol,group_name,dst->vol)<0)
+          err++;
+      }
+    milist_finish(grplist);
+  } else {
+    return MINC2_ERROR;
+  }
+  /*TODO: copy history attribute, because micopy_attr doesn't copy it*/
+
+
+  return err>0?MINC2_ERROR:MINC2_SUCCESS;
+}
 
 
 const char * minc2_data_type_name(int minc2_type_id)

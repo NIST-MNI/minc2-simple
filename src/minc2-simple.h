@@ -158,6 +158,7 @@ int minc2_save_complete_volume(minc2_file_handle h,const void *buffer,int repres
 
 /**
  * Specify flags to use scaling
+ * this have to be set before minc2_create
  */
 int minc2_set_scaling(minc2_file_handle h,int use_global_scaling,int use_slice_scaling);
 
@@ -173,6 +174,21 @@ int minc2_set_volume_range(minc2_file_handle h,double value_min,double value_max
  */
 int minc2_set_slice_range(minc2_file_handle h,int *start,double value_min,double value_max);
 
+/**
+ * convert world X,Y,Z coordinates to voxel indexes (also in X,Y,Z order)
+ */
+int minc2_world_to_voxel(minc2_file_handle h,const double *world,double *voxel);
+
+/**
+ * convert voxel X,Y,Z indexes to world coordinates (also in X,Y,Z order)
+ */
+int minc2_voxel_to_world(minc2_file_handle h,const double *voxel,double *world);
+
+
+/**
+ * transfer attributes from one volume to another
+ */
+int minc2_copy_metadata(minc2_file_handle src,minc2_file_handle dst);
 
 /**
  * write hyperslab, using current dimension order
