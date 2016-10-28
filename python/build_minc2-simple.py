@@ -1,11 +1,26 @@
-#ifndef MINC2_SIMPLE_H
-#define MINC2_SIMPLE_H
+import os
+import sys
+from cffi import FFI
 
-#ifdef __cplusplus
-extern "C" {               /* Hey, Mr. Compiler - this is "C" code! */
-#endif /* __cplusplus defined */
- 
+ffi = FFI()
 
+print(os.path.dirname(__file__))
+src=""
+with open(os.path.join(os.path.dirname(__file__), "../src/minc2-simple.c"),'r') as f:
+    src=f.read()
+
+ffi.set_source("m2_simple",
+    src,
+    # The important thing is to include libc in the list of libraries we're
+    # linking against:
+    libraries=["minc2","c"],
+    include_dirs=["/opt/minc/1.9.13/include","/home/vfonov/src/minc2-simple/src"],
+    library_dirs=["/home/vfonov/src/build/minc2-simple/src","/opt/minc/1.9.13/lib"],
+    
+)
+
+ffi.cdef(
+    """
 /**
   * minc2 dimension types
   */ 
@@ -72,11 +87,9 @@ typedef struct minc2_file* minc2_file_handle;
  */
 int minc2_allocate(minc2_file_handle * h);
 
-/**
- * alternative version
- */
 minc2_file_handle minc2_allocate0(void);
 
+int minc2_destroy(minc2_file_handle h);
 
 /** 
  * initialize minc2 file structure
@@ -88,13 +101,6 @@ int minc2_init(minc2_file_handle h);
  * will call standard free on it
  */
 int minc2_free(minc2_file_handle h);
-
-/**
- * close minc2 file if it's open,
- * then deallocate minc2 file structure
- */
-int minc2_destroy(minc2_file_handle h);
-
 
 /**
  * open existing file
@@ -223,15 +229,11 @@ const char * minc2_data_type_name(int minc2_type_id);
 /**
  * return human-readable dimension name
  */
-const char * minc2_dim_type_name(int minc2_dim_id);
+const char * minc2_dim_type_name(int minc2_dim_id);    
+    """
+    )
 
 
-#ifdef __cplusplus
-}
-#endif /* __cplusplus defined */
-
-
-#endif /*MINC2_SIMPLE_H*/
-
-
-/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c*/
+if __name__ == "__main__":
+    ffi.compile(verbose=True)
+    

@@ -1,10 +1,14 @@
-LINK_LIBRARIES(${LIBMINC_LIBRARIES})
+#LINK_LIBRARIES(${LIBMINC_LIBRARIES})
 
-ADD_LIBRARY(minc2-simple 
+ADD_LIBRARY(minc2-simple STATIC
             minc2-simple.c
             minc2-simple.h
             )
-            
+
+# ADD_LIBRARY(minc2-simple-static STATIC
+#             minc2-simple.c
+#             minc2-simple.h
+#             )
             
 TARGET_LINK_LIBRARIES(minc2-simple ${LIBMINC_LIBRARIES})
 

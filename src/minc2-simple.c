@@ -54,6 +54,22 @@ int minc2_allocate(minc2_file_handle * h)
   return *h==NULL?MINC2_ERROR:MINC2_SUCCESS;
 }
 
+minc2_file_handle minc2_allocate0(void)
+{
+  minc2_file_handle h;
+  if(minc2_allocate(&h)!=MINC2_SUCCESS)
+    return NULL;
+  return h;
+}
+
+int minc2_destroy(minc2_file_handle h)
+{
+  if(h->vol)
+    minc2_close(h);
+  return minc2_free(h);
+}
+
+
 int minc2_init(minc2_file_handle h)
 {
   memset(h,0,sizeof(struct minc2_file));
@@ -62,6 +78,8 @@ int minc2_init(minc2_file_handle h)
 
 int minc2_free(minc2_file_handle h)
 {
+  if(!h)
+    return MINC2_SUCCESS;
   _minc2_cleanup_dimensions(h);
   free(h);
   return MINC2_SUCCESS;
@@ -74,13 +92,10 @@ int minc2_open(minc2_file_handle h, const char * path)
   
   /*real volume range, only awailable when slice scaling is off*/
   double volume_min=0.0,volume_max=1.0;
-  int spatial_dimension_count=0;
-  int spatial_dimension=0;
-  int usable_dimensions=0;
   miclass_t volume_data_class;
   mitype_t  store_type;
-  int i;
   int n_dims;
+  int i;
   
   if ( miopen_volume(path, MI2_OPEN_READ, &h->vol) < 0 )
     return MINC2_ERROR;
@@ -279,6 +294,8 @@ int minc2_open(minc2_file_handle h, const char * path)
       MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported data class");
       return MINC2_ERROR;
   } //end of switch
+
+  return MINC2_SUCCESS;
 }
 
 
@@ -389,6 +406,7 @@ int minc2_ndim(minc2_file_handle h,int *ndim)
     *ndim=h->ndims;
   } else 
     return MINC2_ERROR;
+  return MINC2_SUCCESS;
 }
 
 int minc2_nelement(minc2_file_handle h,int *nelement)
@@ -409,7 +427,6 @@ int minc2_nelement(minc2_file_handle h,int *nelement)
 int minc2_load_complete_volume( minc2_file_handle h,void *buffer,int representation_type)
 {
   mitype_t buffer_type=MI_TYPE_UBYTE;
-  int usable_dimensions=0;
   int i;
   int err=MINC2_SUCCESS;
 
@@ -456,9 +473,8 @@ _GET_BUFFER_MIN_MAX(type_out,buffer,buffer_length,buffer_min,buffer_max) \
 int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type)
 {
   mitype_t buffer_type=MI_TYPE_UBYTE;
-  mitype_t file_store_type=MI_TYPE_UBYTE;
+  /*mitype_t file_store_type=MI_TYPE_UBYTE;*/
   
-  int usable_dimensions=0;
   int i;
   int err=MINC2_SUCCESS;
   size_t   buffer_length=1;
@@ -743,7 +759,6 @@ int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int st
 
 int minc2_create(minc2_file_handle h,const char * path)
 {
-  int i;
   int err;
   /**/
   mivolumeprops_t hprops;
@@ -831,7 +846,7 @@ int minc2_create(minc2_file_handle h,const char * path)
 int minc2_world_to_voxel(minc2_file_handle h,const double *world,double *voxel)
 {
   if(!h->vol)
-    MINC2_ERROR;
+    return MINC2_ERROR;
 
   if(miconvert_world_to_voxel(h->vol,world,voxel)<0)
     return MINC2_ERROR;
@@ -843,7 +858,7 @@ int minc2_world_to_voxel(minc2_file_handle h,const double *world,double *voxel)
 int minc2_voxel_to_world(minc2_file_handle h,const double *voxel,double *world)
 {
   if(!h->vol)
-    MINC2_ERROR;
+    return MINC2_ERROR;
 
   if(miconvert_voxel_to_world(h->vol,voxel,world)<0)
     return MINC2_ERROR;
@@ -894,7 +909,6 @@ static int _minc2_cleanup_dimensions(minc2_file_handle h)
 
 static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims)
 {
-  int i;
   _minc2_cleanup_dimensions(h);
 
   h->ndims=nDims;
@@ -925,7 +939,7 @@ int minc2_copy_metadata(minc2_file_handle src,minc2_file_handle dst)
   if ( (milist_start(src->vol, "", 0, &grplist) ) == MI_NOERROR )
   {
       char           group_name[256];
-      milisthandle_t attlist;
+      /*milisthandle_t attlist;*/
       while( milist_grp_next(grplist, group_name, sizeof(group_name) ) == MI_NOERROR )
       {
         if(micopy_attr(src->vol,group_name,dst->vol)<0)
