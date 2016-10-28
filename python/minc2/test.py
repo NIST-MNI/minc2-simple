@@ -1,4 +1,4 @@
-from simple.minc2 import minc2_file
+from minc2.simple import minc2_file
 import sys
 
 
