@@ -4,19 +4,21 @@ from cffi import FFI
 
 ffi = FFI()
 
-print(os.path.dirname(__file__))
+minc_prefix="/opt/minc/1.9.13"
+source_path=os.path.join(os.path.dirname(__file__), "../../src")
+
 src=""
-with open(os.path.join(os.path.dirname(__file__), "../src/minc2-simple.c"),'r') as f:
+
+with open(os.path.join(source_path,"minc2-simple.c"),'r') as f:
     src=f.read()
 
-ffi.set_source("m2_simple",
+ffi.set_source("minc2._simple",
     src,
     # The important thing is to include libc in the list of libraries we're
     # linking against:
     libraries=["minc2","c"],
-    include_dirs=["/opt/minc/1.9.13/include","/home/vfonov/src/minc2-simple/src"],
-    library_dirs=["/home/vfonov/src/build/minc2-simple/src","/opt/minc/1.9.13/lib"],
-    
+    include_dirs=[os.path.join(minc_prefix,"include"),source_path],
+    library_dirs=[os.path.join(minc_prefix,"lib")],
 )
 
 ffi.cdef(

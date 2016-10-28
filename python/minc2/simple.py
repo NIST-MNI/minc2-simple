@@ -1,7 +1,6 @@
-from m2_simple import ffi,lib
-from utils import to_bytes
-from utils import text_type
-
+from ._simple import ffi,lib
+from .utils import to_bytes
+from .utils import text_type
 
 
 class minc2_file(object):
@@ -20,11 +19,4 @@ class minc2_file(object):
         dd=ffi.new("int*", 0)
         lib.minc2_ndim(self._v,dd)
         return dd[0]
-    
-
-
-if __name__ == "__main__":
-    m=minc2_file("/extra/mni/me/mc_fonv7706.2007-06-14_09-42-45.Z25-03_S_nrx-t1g.mnc.gz")
-    print("dims={}".format(m.ndim()))
-    m.close()
     
