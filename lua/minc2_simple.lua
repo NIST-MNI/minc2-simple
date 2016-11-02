@@ -3,7 +3,6 @@
 -- using FFI 
 local ffi = require("ffi")
 
-
 -- contents of ../src/minc2-simple.h :
 ffi.cdef[[
 /**
@@ -226,13 +225,34 @@ const char * minc2_data_type_name(int minc2_type_id);
 const char * minc2_dim_type_name(int minc2_dim_id);
     ]]
 
-    
-local simple = ffi.load("")
-    
-local minc2_simple = {}
+local lib = ffi.load("/home/vfonov/src/torch/install/lib/libminc2-simple.so") -- for now fixed path
+
+-- local mymodule={}
+
+minc2_simple = {}
+minc2_simple.__index = minc2_simple
+
+function minc2_simple.new()
+  local self = setmetatable({}, minc2_simple)
+  self._v=ffi.gc(lib.minc2_allocate0(),lib.minc2_destroy)
+  return self
+end
+
+-- open existing minc2 file
+function minc2_simple:open(path)
+    print("Going to open:"..path)
+    lib.minc2_open(self._v,path)
+end
+
+function minc2_simple:close()
+    lib.minc2_close(self._v)
+end
 
 
+function minc2_simple:ndim()
+    dd=ffi.new("int[1]")
+    lib.minc2_ndim(self._v,dd)
+    return dd[0]
+end
 
-
-
-return minc2_simple
+return { minc2_simple=minc2_simple }

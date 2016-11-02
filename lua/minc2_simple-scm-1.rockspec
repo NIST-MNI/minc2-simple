@@ -10,5 +10,10 @@ description = {
 dependencies = {}
 build = {
    type = "cmake",
-   modules = {}
+   modules = {},
+   variables = {
+    CMAKE_BUILD_TYPE="Release",
+    CMAKE_PREFIX_PATH="$(LUA_BINDIR)/..",
+    CMAKE_INSTALL_PREFIX="$(PREFIX)"
+  }
 }
