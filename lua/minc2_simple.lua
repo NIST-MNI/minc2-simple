@@ -225,34 +225,39 @@ const char * minc2_data_type_name(int minc2_type_id);
 const char * minc2_dim_type_name(int minc2_dim_id);
     ]]
 
-local lib = ffi.load("/home/vfonov/src/torch/install/lib/libminc2-simple.so") -- for now fixed path
+local lib = ffi.load("minc2-simple") -- for now fixed path
 
--- local mymodule={}
+minc2_file = {}
+minc2_file.__index = minc2_file
 
-minc2_simple = {}
-minc2_simple.__index = minc2_simple
-
-function minc2_simple.new()
-  local self = setmetatable({}, minc2_simple)
+function minc2_file.new()
+  local self = setmetatable({}, minc2_file)
   self._v=ffi.gc(lib.minc2_allocate0(),lib.minc2_destroy)
   return self
 end
 
 -- open existing minc2 file
-function minc2_simple:open(path)
-    print("Going to open:"..path)
+function minc2_file:open(path)
+    --print("Going to open:"..path)
+    assert(path,"Provide minc2 file")
     lib.minc2_open(self._v,path)
 end
 
-function minc2_simple:close()
+function minc2_file:close()
     lib.minc2_close(self._v)
 end
 
-
-function minc2_simple:ndim()
+function minc2_file:ndim()
     dd=ffi.new("int[1]")
     lib.minc2_ndim(self._v,dd)
     return dd[0]
 end
 
-return { minc2_simple=minc2_simple }
+function minc2_file:dims()
+    local dims=ffi.new("struct minc2_dimension*[1]")
+    lib.minc2_get_representation_dimensions(self._v,dims)
+    return dims[0]
+end
+
+-- this is all we have in the module
+return { minc2_file=minc2_file }
