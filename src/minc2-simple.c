@@ -404,8 +404,10 @@ int minc2_ndim(minc2_file_handle h,int *ndim)
   if(h->ndims)
   {
     *ndim=h->ndims;
-  } else 
+  } else {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Dimensions undefined");
     return MINC2_ERROR;
+  }
   return MINC2_SUCCESS;
 }
 
@@ -759,12 +761,13 @@ int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int st
 
 int minc2_create(minc2_file_handle h,const char * path)
 {
-  int err;
+  int err=MINC2_SUCCESS;
   /**/
   mivolumeprops_t hprops;
   
   if( minew_volume_props(&hprops) < 0)
   {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't set volume properties");
     return MINC2_ERROR;
   }
   
@@ -773,11 +776,13 @@ int minc2_create(minc2_file_handle h,const char * path)
   {
     if(miset_props_compression_type(hprops, MI_COMPRESS_ZLIB)<0)
     {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't set compression");
       return MINC2_ERROR;
     }
 
     if(miset_props_zlib_compression(hprops,miget_cfg_int(MICFG_COMPRESS))<0)
     {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't set compression");
       return MINC2_ERROR;
     }
   }
@@ -785,6 +790,7 @@ int minc2_create(minc2_file_handle h,const char * path)
   {
     if(miset_props_compression_type(hprops, MI_COMPRESS_NONE)<0)
     {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't set compression");
       return MINC2_ERROR;
     }
   }

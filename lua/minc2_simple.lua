@@ -230,34 +230,140 @@ local lib = ffi.load("minc2-simple") -- for now fixed path
 minc2_file = {}
 minc2_file.__index = minc2_file
 
-function minc2_file.new()
+function minc2_file.new(path)
   local self = setmetatable({}, minc2_file)
   self._v=ffi.gc(lib.minc2_allocate0(),lib.minc2_destroy)
+  if path~=nil then
+      self:open(path)
+  end
   return self
 end
 
 -- open existing minc2 file
 function minc2_file:open(path)
     --print("Going to open:"..path)
-    assert(path,"Provide minc2 file")
+    assert(path~=nil,"Provide minc2 file")
     lib.minc2_open(self._v,path)
 end
 
+-- close a minc2 file
 function minc2_file:close()
     lib.minc2_close(self._v)
 end
 
+-- query number of dimensions
 function minc2_file:ndim()
     dd=ffi.new("int[1]")
     lib.minc2_ndim(self._v,dd)
     return dd[0]
 end
 
-function minc2_file:dims()
+-- provide descriptor of dimensions
+function minc2_file:store_dims()
+    local dims=ffi.new("struct minc2_dimension*[1]")
+    lib.minc2_get_store_dimensions(self._v,dims)
+    return dims[0]
+end
+
+-- provide descriptor of dimensions
+function minc2_file:representation_dims()
     local dims=ffi.new("struct minc2_dimension*[1]")
     lib.minc2_get_representation_dimensions(self._v,dims)
     return dims[0]
 end
 
+
+-- define a new volume
+function minc2_file:define(dims,store_type,representation_type)
+    assert(dims~=nil,"dims need to be defined")
+    assert(store_type~=nil,"Store data type need to be set")
+    assert(representation_type~=nil,"Data type need to be set")
+    assert(lib.minc2_define(self._v,dims,store_type,representation_type)==ffi.C.MINC2_SUCCESS)
+end
+
+-- create a  new minc2 file
+function minc2_file:create(path)
+    assert( path~=nil )
+    assert( lib.minc2_create(self._v, path ) == ffi.C.MINC2_SUCCESS)
+end
+
+function minc2_file:copy_metadata(another)
+    assert(another)
+    assert(lib.minc2_copy_metadata(another._v,self._v)==ffi.C.MINC2_SUCCESS)
+end
+
+function minc2_file:load_complete_volume(data_type)
+    data_type=data_type or ffi.C.MINC2_FLOAT
+    buf_len=ffi.new("int[1]")
+    lib.minc2_nelement(self._v,buf_len)
+    buf_len=buf_len[0]
+    buf=nil
+    if data_type==ffi.C.MINC2_BYTE then 
+        buf=ffi.new("int8_t[?]",buf_len)
+    elseif data_type==ffi.C.MINC2_UBYTE then 
+        buf=ffi.new("uint8_t[?]",buf_len)
+    elseif data_type==ffi.C.MINC2_SHORT then 
+        buf=ffi.new("int16_t[?]",buf_len)
+    elseif data_type==ffi.C.MINC2_USHORT then 
+        buf=ffi.new("uint16_t[?]",buf_len)
+    elseif data_type==ffi.C.MINC2_INT then 
+        buf=ffi.new("int32_t[?]",buf_len)
+    elseif data_type==ffi.C.MINC2_UINT then 
+        buf=ffi.new("uint32_t[?]",buf_len)
+    elseif data_type==ffi.C.MINC2_FLOAT then 
+        buf=ffi.new("float[?]",buf_len)
+    elseif data_type==ffi.C.MINC2_DOUBLE then 
+        buf=ffi.new("double[?]",buf_len)
+    else
+        assert(false,"Unsupported  yet")
+    end
+    assert(lib.minc2_load_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
+    return buf
+end
+
+
+function minc2_file:save_complete_volume(buf,data_type)
+    data_type=data_type or ffi.C.MINC2_FLOAT
+    assert(buf~=nil)
+    assert(lib.minc2_save_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
+    return buf
+end
+
+
 -- this is all we have in the module
-return { minc2_file=minc2_file }
+return { 
+    -- minc2 constants
+    
+    -- minc2 dimensions
+    MINC2_DIM_UNKNOWN=ffi.C.MINC2_DIM_UNKNOWN,
+    MINC2_DIM_X=ffi.C.MINC2_DIM_X,
+    MINC2_DIM_Y=ffi.C.MINC2_DIM_Y,
+    MINC2_DIM_Z=ffi.C.MINC2_DIM_Z,
+    MINC2_DIM_TIME=ffi.C.MINC2_DIM_TIME,
+    MINC2_DIM_VEC=ffi.C.MINC2_DIM_VEC,
+    MINC2_DIM_END=ffi.C.MINC2_DIM_END,
+    
+    -- minc2 data types
+    MINC2_BYTE =ffi.C.MINC2_BYTE ,
+    MINC2_SHORT =ffi.C.MINC2_SHORT ,
+    MINC2_INT =ffi.C.MINC2_INT ,
+    MINC2_FLOAT =ffi.C.MINC2_FLOAT ,
+    MINC2_DOUBLE =ffi.C.MINC2_DOUBLE ,
+    MINC2_STRING =ffi.C.MINC2_STRING ,
+    MINC2_UBYTE =ffi.C.MINC2_UBYTE ,
+    MINC2_USHORT =ffi.C.MINC2_USHORT ,
+    MINC2_UINT =ffi.C.MINC2_UINT ,
+    MINC2_SCOMPLEX =ffi.C.MINC2_SCOMPLEX ,
+    MINC2_ICOMPLEX =ffi.C.MINC2_ICOMPLEX ,
+    MINC2_FCOMPLEX =ffi.C.MINC2_FCOMPLEX ,
+    MINC2_DCOMPLEX =ffi.C.MINC2_DCOMPLEX ,
+    MINC2_MAX_TYPE_ID=ffi.C.MINC2_MAX_TYPE_ID,
+    MINC2_UNKNOWN  =ffi.C.MINC2_UNKNOWN  ,
+
+    -- minc2 status
+    MINC2_SUCCESS=ffi.C.MINC2_SUCCESS,
+    MINC2_ERROR=ffi.C.MINC2_ERROR,
+    
+    -- minc2 file reader/writer
+    minc2_file=minc2_file 
+}
