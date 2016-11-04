@@ -275,9 +275,20 @@ end
 
 -- define a new volume
 function minc2_file:define(dims,store_type,representation_type)
+    
     assert(dims~=nil,"dims need to be defined")
     assert(store_type~=nil,"Store data type need to be set")
     assert(representation_type~=nil,"Data type need to be set")
+    
+    if type(dims)== "table" then
+        --assume user didn't provide m2.MINC2_DIM_END
+        local mydims={}
+        for k, v in pairs(dims) do mydims[k] = v end
+        mydims[#mydims]={id=m2.MINC2_DIM_END }
+        
+        dims=ffi.new("struct minc2_dimension[?]",#mydims,mydims)
+    end
+    
     assert(lib.minc2_define(self._v,dims,store_type,representation_type)==ffi.C.MINC2_SUCCESS)
 end
 
@@ -319,6 +330,10 @@ function minc2_file:load_complete_volume(data_type)
     end
     assert(lib.minc2_load_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
     return buf
+end
+
+function minc2_file:setup_standard_order()
+    assert( lib.minc2_setup_standard_order(self._v) == ffi.C.MINC2_SUCCESS)
 end
 
 

@@ -13,13 +13,27 @@ end
 
 ooo=m2.minc2_file.new()
 -- will create file with same dimensions
-ooo:define(dims, m2.MINC2_BYTE, m2.MINC2_FLOAT)
+
+my_dims={
+    {id=m2.MINC2_DIM_X,  length=193,start=96.0,step=-1.0},
+    {id=m2.MINC2_DIM_Y,  length=229,start=-132.0,step=1.0},
+    {id=m2.MINC2_DIM_Z,  length=193,start=-78.0,step=1.0}
+}
+
+ooo:define(my_dims, m2.MINC2_BYTE, m2.MINC2_FLOAT)
 ooo:create('test_out.mnc')
 ooo:copy_metadata(qqq)
 
+-- going to read and write in standard order (XYZ)
+qqq:setup_standard_order()
+ooo:setup_standard_order()
+-- load into a c buffer
 buf=qqq:load_complete_volume(m2.MINC2_FLOAT)
+-- save from buffer to volume
 ooo:save_complete_volume(buf,m2.MINC2_FLOAT)
 
+
+-- not strictly needed 
 ooo:close()
 
 
