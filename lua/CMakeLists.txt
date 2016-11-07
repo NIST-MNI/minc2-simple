@@ -32,7 +32,7 @@ target_link_libraries(minc2-simple ${LIBMINC_LIBRARIES})
 install(TARGETS minc2-simple DESTINATION lib)
 
 SET(LUASRC 
- minc2_simple.lua
+ init.lua
 )
 
 ADD_TORCH_PACKAGE(minc2_simple "" "${LUASRC}" "minc2-simple Package")
