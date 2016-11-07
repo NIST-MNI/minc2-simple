@@ -72,7 +72,22 @@ criterion = nn.MSECriterion()
 
 -- do some funky processing
 
-out=mlp:forward(t1s[1])
+-- out=mlp:forward(t1s[1])
+
+for i = 1,2500 do
+    local input= dataset[i][1]
+    local output = dataset[i][2]
+    
+    -- feed it to the neural network and the criterion
+    criterion:forward(mlp:forward(input), output)
+    
+    
+    mlp:zeroGradParameters()
+    mlp:backward(input, criterion:backward(mlp.output, output))
+    mlp:updateParameters(0.01)
+    print(i)
+end
+    
 
 local t1=m2.minc2_file.new(hc_samples[1][1])
 local out_minc=m2.minc2_file.new()
