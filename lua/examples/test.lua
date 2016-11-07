@@ -36,6 +36,7 @@ print(string.format("loaded tensor %s of size :%s",torch.type(data),data:size())
 -- save from buffer to volume
 ooo:save_complete_volume(data)
 
-
--- not strictly needed 
+-- not strictly needed , but will flush the data to disk immedeately
 ooo:close()
+-- not strictly needed 
+qqq:close()
