@@ -2,6 +2,7 @@
 -- using minc2-simple c glue
 -- using FFI 
 local ffi = require("ffi")
+require('torch')
 
 -- contents of ../src/minc2-simple.h :
 ffi.cdef[[
@@ -243,32 +244,32 @@ end
 function minc2_file:open(path)
     --print("Going to open:"..path)
     assert(path~=nil,"Provide minc2 file")
-    lib.minc2_open(self._v,path)
+    assert( lib.minc2_open(self._v,path)==ffi.C.MINC2_SUCCESS )
 end
 
 -- close a minc2 file
 function minc2_file:close()
-    lib.minc2_close(self._v)
+    assert(lib.minc2_close(self._v)==ffi.C.MINC2_SUCCESS)
 end
 
 -- query number of dimensions
 function minc2_file:ndim()
     dd=ffi.new("int[1]")
-    lib.minc2_ndim(self._v,dd)
+    assert(lib.minc2_ndim(self._v,dd)==ffi.C.MINC2_SUCCESS)
     return dd[0]
 end
 
 -- provide descriptor of dimensions
 function minc2_file:store_dims()
     local dims=ffi.new("struct minc2_dimension*[1]")
-    lib.minc2_get_store_dimensions(self._v,dims)
+    assert(lib.minc2_get_store_dimensions(self._v,dims)==ffi.C.MINC2_SUCCESS)
     return dims[0]
 end
 
 -- provide descriptor of dimensions
 function minc2_file:representation_dims()
     local dims=ffi.new("struct minc2_dimension*[1]")
-    lib.minc2_get_representation_dimensions(self._v,dims)
+    assert(lib.minc2_get_representation_dimensions(self._v,dims)==ffi.C.MINC2_SUCCESS)
     return dims[0]
 end
 
@@ -303,32 +304,74 @@ function minc2_file:copy_metadata(another)
     assert(lib.minc2_copy_metadata(another._v,self._v)==ffi.C.MINC2_SUCCESS)
 end
 
+-- function minc2_file:load_complete_volume(data_type)
+--     data_type=data_type or ffi.C.MINC2_FLOAT
+--     buf_len=ffi.new("int[1]")
+--     lib.minc2_nelement(self._v,buf_len)
+--     buf_len=buf_len[0]
+--     buf=nil
+--     if data_type==ffi.C.MINC2_BYTE then 
+--         buf=ffi.new("int8_t[?]",buf_len)
+--     elseif data_type==ffi.C.MINC2_UBYTE then 
+--         buf=ffi.new("uint8_t[?]",buf_len)
+--     elseif data_type==ffi.C.MINC2_SHORT then 
+--         buf=ffi.new("int16_t[?]",buf_len)
+--     elseif data_type==ffi.C.MINC2_USHORT then 
+--         buf=ffi.new("uint16_t[?]",buf_len)
+--     elseif data_type==ffi.C.MINC2_INT then 
+--         buf=ffi.new("int32_t[?]",buf_len)
+--     elseif data_type==ffi.C.MINC2_UINT then 
+--         buf=ffi.new("uint32_t[?]",buf_len)
+--     elseif data_type==ffi.C.MINC2_FLOAT then 
+--         buf=ffi.new("float[?]",buf_len)
+--     elseif data_type==ffi.C.MINC2_DOUBLE then 
+--         buf=ffi.new("double[?]",buf_len)
+--     else
+--         assert(false,"Unsupported  yet")
+--     end
+--     assert(lib.minc2_load_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
+--     return buf
+-- end
+
 function minc2_file:load_complete_volume(data_type)
+    -- will be torch tensors
+    -- require('torch')
     data_type=data_type or ffi.C.MINC2_FLOAT
-    buf_len=ffi.new("int[1]")
-    lib.minc2_nelement(self._v,buf_len)
-    buf_len=buf_len[0]
-    buf=nil
+    -- local buf_len=ffi.new("int[1]")
+    -- lib.minc2_nelement(self._v,buf_len)
+    -- buf_len=buf_len[0]
+    local buf=nil
+    local _dims=self:representation_dims()
+    local dims=torch.LongStorage(self:ndim())
+    local nelements=1
+    for i=0,(self:ndim()-1) do 
+        dims[i+1]=_dims[i].length
+        nelements=nelements*_dims[i].length
+    end
+    
     if data_type==ffi.C.MINC2_BYTE then 
-        buf=ffi.new("int8_t[?]",buf_len)
+        buf=torch.CharTensor(dims)
     elseif data_type==ffi.C.MINC2_UBYTE then 
-        buf=ffi.new("uint8_t[?]",buf_len)
+        buf=torch.ByteTensor(dims)
     elseif data_type==ffi.C.MINC2_SHORT then 
-        buf=ffi.new("int16_t[?]",buf_len)
+        buf=torch.ShortTensor(dims)
     elseif data_type==ffi.C.MINC2_USHORT then 
-        buf=ffi.new("uint16_t[?]",buf_len)
+        buf=torch.ShortTensor(dims)
     elseif data_type==ffi.C.MINC2_INT then 
-        buf=ffi.new("int32_t[?]",buf_len)
+        buf=torch.IntTensor(dims)
     elseif data_type==ffi.C.MINC2_UINT then 
-        buf=ffi.new("uint32_t[?]",buf_len)
+        buf=torch.IntTensor(dims)
     elseif data_type==ffi.C.MINC2_FLOAT then 
-        buf=ffi.new("float[?]",buf_len)
+        buf=torch.FloatTensor(dims)
     elseif data_type==ffi.C.MINC2_DOUBLE then 
-        buf=ffi.new("double[?]",buf_len)
+        buf=torch.DoubleTensor(dims)
     else
         assert(false,"Unsupported  yet")
     end
-    assert(lib.minc2_load_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
+    assert( 
+        lib.minc2_load_complete_volume(self._v, buf:storage():data(), data_type)==ffi.C.MINC2_SUCCESS 
+    )
+    
     return buf
 end
 
@@ -337,10 +380,49 @@ function minc2_file:setup_standard_order()
 end
 
 
-function minc2_file:save_complete_volume(buf,data_type)
-    data_type=data_type or ffi.C.MINC2_FLOAT
+-- function minc2_file:save_complete_volume(buf,data_type)
+--     data_type=data_type or ffi.C.MINC2_FLOAT
+--     assert(buf~=nil)
+--     assert(lib.minc2_save_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
+--     return buf
+-- end
+
+
+function minc2_file:save_complete_volume(buf)
     assert(buf~=nil)
-    assert(lib.minc2_save_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
+    --local t=require('torch')
+    local data_type=ffi.C.MINC2_FLOAT
+    -- local s=buf:storage()
+    local store_type=torch.type(buf)
+    
+    -- TODO: implement dimension checking!
+    -- TODO: check if tensor is contigious
+    -- TODO: figure out how to save non-contigious tensor
+    
+    if store_type == 'torch.CharTensor' then
+        data_type=ffi.C.MINC2_BYTE
+    elseif store_type=='torch.ByteTensor' then 
+        data_type=ffi.C.MINC2_UBYTE
+    elseif store_type=='torch.ShortTensor' then 
+        data_type=ffi.C.MINC2_SHORT
+    elseif store_type=='torch.ShortTensor' then 
+        data_type=ffi.C.MINC2_USHORT
+    elseif store_type=='torch.IntTensor' then 
+        data_type=ffi.C.MINC2_INT
+    elseif store_type == 'torch.IntTensor' then 
+        data_type=ffi.C.MINC2_UINT
+    elseif store_type == 'torch.FloatTensor' then 
+        data_type=ffi.C.MINC2_FLOAT
+    elseif store_type == 'torch.DoubleTensor' then 
+        data_type=ffi.C.MINC2_DOUBLE
+    else
+        print(string.format("store_type=%s",store_type))
+        assert(false,"Unsupported  yet")
+    end
+    
+    assert(
+        lib.minc2_save_complete_volume(self._v,buf:storage():data(),data_type)==ffi.C.MINC2_SUCCESS
+        )
     return buf
 end
 

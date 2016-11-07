@@ -96,7 +96,7 @@ int minc2_open(minc2_file_handle h, const char * path)
   mitype_t  store_type;
   int n_dims;
   int i;
-  
+
   if ( miopen_volume(path, MI2_OPEN_READ, &h->vol) < 0 )
     return MINC2_ERROR;
   

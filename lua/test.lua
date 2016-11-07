@@ -1,8 +1,7 @@
 m2=require 'minc2_simple'
 
-qqq=m2.minc2_file.new('/home/vfonov/data/viola03/models/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
--- qqq:open('/home/vfonov/mni/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
-
+-- qqq=m2.minc2_file.new('/home/vfonov/data/viola03/models/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
+qqq=m2.minc2_file.new('/home/vfonov/mni/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
 print(string.format("Loaded minc %dD file",qqq:ndim()))
 dims=qqq:store_dims()
 
@@ -27,14 +26,16 @@ ooo:copy_metadata(qqq)
 -- going to read and write in standard order (XYZ)
 qqq:setup_standard_order()
 ooo:setup_standard_order()
+print("Loading from file...")
+
 -- load into a c buffer
-buf=qqq:load_complete_volume(m2.MINC2_FLOAT)
+data=qqq:load_complete_volume(m2.MINC2_FLOAT)
+
+print(string.format("loaded tensor %s of size :%s",torch.type(data),data:size()))
+
 -- save from buffer to volume
-ooo:save_complete_volume(buf,m2.MINC2_FLOAT)
+ooo:save_complete_volume(data)
 
 
 -- not strictly needed 
 ooo:close()
-
-
-
