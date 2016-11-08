@@ -343,10 +343,12 @@ function minc2_file:load_complete_volume(data_type)
     local buf=nil
     local _dims=self:representation_dims()
     local dims=torch.LongStorage(self:ndim())
-    local nelements=1
+    -- local nelements=1
+    
+    -- Torch tensor defines dimensions in a slowest first fashion
     for i=0,(self:ndim()-1) do 
-        dims[i+1]=_dims[i].length
-        nelements=nelements*_dims[i].length
+        dims[self:ndim()-i]=_dims[i].length
+        --nelements=nelements*_dims[i].length
     end
     
     if data_type==ffi.C.MINC2_BYTE then 
