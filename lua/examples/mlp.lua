@@ -19,17 +19,17 @@ hc_samples={}
 
 
 -- mlp parameters
-HUs=200  -- number of neurons
-fov=4    -- fov in pixels, patches are (fov*2)**3
-iter=1000 -- number of optimization iterations, for each minibatch 
+HUs=400      -- number of neurons
+fov=4        -- fov in pixels, patches are (fov*2)**3
+iter=1000    -- number of optimization iterations, for each minibatch 
 
-LR=0.02      -- learning rate
+LR=0.04      -- learning rate
 momentum=0.9 -- momentum
 WD=5e-4      -- weight decay
 train=8      -- use first N subjects for training 
 mult=2       -- how many datasets to include in a single training
 test=10      -- subject for testing
-batches=100  -- number of training batches
+batches=10   -- number of training batches
 
 -- seed RNG
 torch.manualSeed(0)
@@ -182,6 +182,7 @@ patch=fov*2
 mlp = nn.Sequential()  -- make a multi-layer perceptron with a single output (yes/no)
 mlp:add(nn.Reshape(patch*patch*patch))
 mlp:add(nn.Linear(patch*patch*patch,HUs))
+mlp:add(nn.Dropout(0.5))
 mlp:add(nn.Tanh())
 mlp:add(nn.Linear(HUs,2))
 mlp:add(nn.LogSoftMax())
@@ -197,11 +198,12 @@ criterion=criterion:cuda()
 
 minibatch=allocate_tiles(dataset[1],fov,stride,mult) -- allocate data in GPU
 
-print("Running optimization using minibatches")
+print(string.format("Running optimization using %d batches and %d iterations per batch",batches,iter))
 
 parameters, gradParameters = mlp:getParameters()
 timer = torch.Timer()
 
+mlp:training()
 for j = 1,batches do
     -- reset optimization state here
     optimState = {
@@ -218,6 +220,7 @@ for j = 1,batches do
     load_time=timer:time().real
     --print(string.format("Data loading:%f",timer:time().real))
     timer:reset()
+    model_name=string.format('mlp_training_%03d.t7',j)
     
     local avg_err=0
     xlua.progress(0,iter)
@@ -235,21 +238,21 @@ for j = 1,batches do
         avg_err=avg_err+err
         if i%20 ==0 then xlua.progress(i,iter) end
     end
-    
-    print(string.format("%d proc %f sec, load: %f sec, err:%f",j,timer:time().real,load_time,avg_err/iter))
-    
+    mlp:clearState()
+    torch.save(model_name,mlp)
+    print(string.format("%d proc %f sec, load: %f sec, avg err:%f",j,timer:time().real,load_time,avg_err/iter))
 end
 
-
-get_tiles(minibatch,dataset,#dataset,fov,stride,mult,false)
+mlp:evaluate()
+get_tiles(minibatch,dataset,test,fov,stride,mult,false)
 out1=mlp:forward(minibatch[1])
 err1=criterion:forward(out1, minibatch[2])
 print(string.format("Error on test dataset:%e",err1))
 print(out1:size())
 
-t_out1=put_tiles(dataset[#dataset],out1,fov,stride,mult,1)
--- t_out2=put_tiles(dataset[#dataset],out1,fov,stride,2)
-t_out2=put_tiles_max(dataset[#dataset],out1,fov,stride,mult)
+t_out1=put_tiles(dataset[1],out1,fov,stride,mult,1)
+-- t_out2=put_tiles(dataset[1],out1,fov,stride,2)
+t_out2=put_tiles_max(dataset[1],out1,fov,stride,mult)
 
 -- reference
 t1=m2.minc2_file.new(hc_samples[1][1])
