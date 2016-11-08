@@ -5,6 +5,7 @@ require 'xlua'
 require 'cutorch'
 require "cunn"
 require "cudnn"
+require "paths"
 
 m2=require 'minc2_simple'
 
@@ -62,15 +63,18 @@ for _,l in pairs(hc_samples) do
                           seg:load_complete_volume(m2.MINC2_INT) }
 end
 
-t1_mean=dataset[1][1]:clone()
-print("removing mean")
-for j=2,(#dataset) do
-    t1_mean:add(dataset[j][1])
+t1_mean=0.0
+t1_sd=0.0
+
+print("removing mean and sd")
+for j=1,(#dataset) do
+    t1_mean=torch.mean(dataset[j][1])
+    t1_sd=torch.std(dataset[j][1])
 end
 t1_mean=t1_mean/#dataset
-
+t1_sd=t1_sd/#dataset
 for j=1,(#dataset) do
-    dataset[j][1]=dataset[j][1]-t1_mean
+    dataset[j][1]=(dataset[j][1]-t1_mean)/t1_sd
 end
 
 
@@ -222,25 +226,31 @@ for j = 1,batches do
     timer:reset()
     model_name=string.format('mlp_training_%03d.t7',j)
     
-    local avg_err=0
-    xlua.progress(0,iter)
-    for i=1,iter do
-        local err, outputs
-        feval = function(x)
-            mlp:zeroGradParameters()
-            outputs = mlp:forward(minibatch[1])
-            err = criterion:forward(outputs, minibatch[2])
-            local gradOutputs = criterion:backward(outputs, minibatch[2])
-            mlp:backward(minibatch[1], gradOutputs)
-            return err, gradParameters
+    if paths.filep(model_name) then
+        mlp=torch.load(model_name)
+        print("Loaded model:"..model_name)
+        print(mlp)
+    else
+        local avg_err=0
+        xlua.progress(0,iter)
+        for i=1,iter do
+            local err, outputs
+            feval = function(x)
+                mlp:zeroGradParameters()
+                outputs = mlp:forward(minibatch[1])
+                err = criterion:forward(outputs, minibatch[2])
+                local gradOutputs = criterion:backward(outputs, minibatch[2])
+                mlp:backward(minibatch[1], gradOutputs)
+                return err, gradParameters
+            end
+            optim.sgd(feval, parameters, optimState)
+            avg_err=avg_err+err
+            if i%20 ==0 then xlua.progress(i,iter) end
         end
-        optim.sgd(feval, parameters, optimState)
-        avg_err=avg_err+err
-        if i%20 ==0 then xlua.progress(i,iter) end
+        mlp:clearState()
+        torch.save(model_name,mlp)
+        print(string.format("%d proc %f sec, load: %f sec, avg err:%f",j,timer:time().real,load_time,avg_err/iter))
     end
-    mlp:clearState()
-    torch.save(model_name,mlp)
-    print(string.format("%d proc %f sec, load: %f sec, avg err:%f",j,timer:time().real,load_time,avg_err/iter))
 end
 
 mlp:evaluate()
