@@ -3,7 +3,6 @@ m2=require 'minc2_simple'
 torch.setdefaulttensortype('torch.FloatTensor')
 require "nn"
 
-
 -- setup input data
 hc_prefix='./'
 hc_list=hc_prefix..'small_10.lst'
@@ -26,20 +25,26 @@ print(#hc_samples)
 t1s={}
 segs={}
 for _,l in pairs(hc_samples) do
+    -- print(string.format("Opening %s %s",l[1],l[2]))
+    
     local t1=m2.minc2_file.new(l[1])
     t1:setup_standard_order()
+    
     local seg=m2.minc2_file.new(l[2])
     seg:setup_standard_order()
     
-    t1s[#t1s+1]=t1:load_complete_volume(m2.MINC2_FLOAT)
-    segs[#t1s+1]=seg:load_complete_volume(m2.MINC2_BYTE)
+    t1s[#t1s+1] = t1:load_complete_volume(m2.MINC2_FLOAT)
+    segs[#segs+1]=seg:load_complete_volume(m2.MINC2_FLOAT)
 end
 
 
 -- will create a simple class for loading data into optimizer
     Dataset = torch.class('Dataset')
     
-    function Dataset:__init(t1s,segs,field) 
+    function Dataset:__init(t1s, segs, field) 
+      
+        print("__init called")
+        -- print(t1s,segs,field)
         self.t1s=t1s
         self.segs=segs
         self.field=field
@@ -59,7 +64,7 @@ dataset = Dataset.new(t1s,segs)
 -- tensor sizes
 sz=t1s[1]:size()
 el=t1s[1]:storage():size()
-HUs=10
+HUs=1
 -- prepare network
 mlp = nn.Sequential()  -- make a multi-layer perceptron
 mlp:add(nn.Reshape(el))
@@ -75,24 +80,42 @@ criterion = nn.MSECriterion()
 -- out=mlp:forward(t1s[1])
 
 for i = 1,2500 do
-    local input= dataset[i][1]
-    local output = dataset[i][2]
+
+    -- minibatch ?
+    -- print(dataset[1])
+    local input  = dataset[1][1]
+    local output = dataset[1][2]
     
+    -- print(string.format("Input:%s output:%s",torch.type(input),torch.type(output)))
     -- feed it to the neural network and the criterion
-    criterion:forward(mlp:forward(input), output)
-    
+    local err=criterion:forward(mlp:forward(input), output)
     
     mlp:zeroGradParameters()
     mlp:backward(input, criterion:backward(mlp.output, output))
     mlp:updateParameters(0.01)
-    print(i)
+    print(string.format("%d -%e",i,err))
 end
     
+
+out1=mlp:forward(dataset[1][1])
+out2=mlp:forward(dataset[2][1])
 
 local t1=m2.minc2_file.new(hc_samples[1][1])
 local out_minc=m2.minc2_file.new()
 out_minc:define(t1:store_dims(), m2.MINC2_BYTE, m2.MINC2_FLOAT)
-out_minc:create("output.mnc")
+out_minc:create("output1.mnc")
 out_minc:setup_standard_order()
-out_minc:save_complete_volume(out)
+out_minc:save_complete_volume(out1)
+
+local out_minc=m2.minc2_file.new()
+out_minc:define(t1:store_dims(), m2.MINC2_BYTE, m2.MINC2_FLOAT)
+out_minc:create("output2.mnc")
+out_minc:setup_standard_order()
+out_minc:save_complete_volume(out1)
+
+local out_minc=m2.minc2_file.new()
+out_minc:define(t1:store_dims(), m2.MINC2_BYTE, m2.MINC2_FLOAT)
+out_minc:create("output3.mnc")
+out_minc:setup_standard_order()
+out_minc:save_complete_volume(dataset[2][1])
 
