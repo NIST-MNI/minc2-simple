@@ -24,7 +24,9 @@ HUs=100       -- number of neurons
 fov=8        -- fov in pixels, patches are (fov*2)**3
 iter=100       -- number of optimization iterations, for each minibatch 
 l1=5         -- layer 1 kernel size
+s1=2         -- layer 2 stride
 l2=3         -- layer 2 kernel size
+s2=2         -- layer 2 stride
 maps1=32
 maps2=32
 LR=0.001      -- learning rate
@@ -32,8 +34,8 @@ momentum=0.9 -- momentum
 WD=5e-4      -- weight decay
 train=8      -- use first N subjects for training 
 mult=1       -- how many datasets to include in a single training
-test=10      -- subject for testing
-batches=10   -- number of training batches
+test=1      -- subject for testing
+batches=1   -- number of training batches
 stride=4
 -- seed RNG
 torch.manualSeed(0)
@@ -87,12 +89,14 @@ end
 
 -- convert volumes into overlapping tiles and create a 4D minibatch
 -- TODO: use stride
-local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd)
+local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd,row_range)
     
     volume_sz=dataset[1][1]:size()
     patch=fov*2
     
-    out_el = ( math.floor((volume_sz[1]-patch+stride-1)/stride) )*
+    row_range=row_range or {(1+fov),(volume_sz[1]-fov)}
+    
+    out_el = ( math.floor((row_range[2]-row_range[1]+stride)/stride) )*
              ( math.floor((volume_sz[2]-patch+stride-1)/stride) )*
              ( math.floor((volume_sz[3]-patch+stride-1)/stride) )*mult
     
@@ -113,12 +117,13 @@ local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd)
         rrr:fill(train)
         dx:fill(0)
     end
-    
     -- TODO: avoid creating temporary tensors somehow?
+    
     out_image=torch.FloatTensor(out_el,1,patch,patch,patch)
     out_label=torch.ByteTensor(out_el)
+    print(out_image:size())
     for m=1,mult do
-        for i=(1+fov),(volume_sz[1]-fov),stride do
+        for i=row_range[1],row_range[1],stride do
             for j=(1+fov),(volume_sz[2]-fov),stride do
                 for k=(1+fov),(volume_sz[3]-fov),stride do
                     
@@ -150,24 +155,17 @@ local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd)
             end
         end
     end
-    -- print(idx,out_el)
---     print(minibatch[1]:size())
---     print(out_image:size())
---     print("---")
---     
---     minibatch[1]:copy(out_image)
---     minibatch[2]:copy(out_label)
---     
---     print(minibatch[1]:size())
---     print(minibatch[2]:size())
---     print("===")
+    minibatch[1]:copy(out_image)
+    minibatch[2]:copy(out_label)
 end
 
-local function allocate_tiles(ds, fov, stride,mult)
+local function allocate_tiles(ds, fov, stride,mult,row_range)
     volume_sz=ds[1]:size()
     patch=fov*2
     
-    out_el = ( math.floor((volume_sz[1]-patch+stride-1)/stride) )*
+    row_range=row_range or {(1+fov),(volume_sz[1]-fov)}
+    
+    out_el = ( math.floor((row_range[2]-row_range[1]+stride)/stride) )*
              ( math.floor((volume_sz[2]-patch+stride-1)/stride) )*
              ( math.floor((volume_sz[3]-patch+stride-1)/stride) )*mult
     
@@ -180,55 +178,47 @@ local function allocate_tiles(ds, fov, stride,mult)
     return {out1,out2}
 end
 
-local function put_tiles(ds, out, fov, stride, mult, ch)
+local function put_tiles(ds, out, fov, stride, mult, ch, range)
     
-    local volume_sz=ds[1]:size()
+    local volume_sz=ds:size()
     
     local patch=fov*2
-    local out_el=(volume_sz[1]-patch)*(volume_sz[2]-patch)*(volume_sz[3]-patch)
-    -- TODO: verify size of out and out_el
     
-    local out_t=torch.Tensor(volume_sz):fill(0.0)
     
-    out_t[{{1+fov,volume_sz[1]-fov},{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}}] = 
-        out:float():view(mult,volume_sz[1]-patch, volume_sz[2]-patch, volume_sz[3]-patch, 2)[{1,{},{},{},ch}]:exp()
+    ds[{range,{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}}] = 
+        out:float():view(mult,range[2]-range[1], volume_sz[2]-patch, volume_sz[3]-patch, 2)[{1,{},{},{},ch}]:exp()
     
-    return out_t
+    return ds
 end
 
-local function put_tiles_max(ds, out, fov, stride,mult)
+local function put_tiles_max(ds, out, fov, stride,mult,range)
     
     local volume_sz=ds[1]:size()
-    
     local patch=fov*2
-    local out_el=(volume_sz[1]-patch)*(volume_sz[2]-patch)*(volume_sz[3]-patch)
-    -- TODO: verify size of out and out_el
     
-    local out_t=torch.ByteTensor(volume_sz):fill(0)
+   
+    _,ds[ {range,{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}} ] = 
+        out:float():view(mult,range[2]-range[1], volume_sz[2]-patch, volume_sz[3]-patch,2)[{1,{},{},{},{}}]:max(4)
     
-    _,out_t[ {{1+fov,volume_sz[1]-fov},{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}} ] = 
-        out:float():view(mult,volume_sz[1]-patch, volume_sz[2]-patch, volume_sz[3]-patch,2)[{1,{},{},{},{}}]:max(4)
-    
-    return out_t
+    return ds
 end
 
 
 patch=fov*2 -- size of input chunks
 
-patch_l1=patch - l1+1
-patch_l2=(patch_l1)/2-l2+1
+patch_l1=math.floor((patch - l1)/s1)+1
+patch_l2=math.floor((patch_l1-l2)/s2)+1
 
 
 -- prepare network
 model = nn.Sequential()  -- make a multi-layer perceptron with a single output 
-model:add(nn.VolumetricConvolution(1,maps1,l1,l1,l1)) -- converts patch**3 -> patch_l1**3
+model:add(nn.VolumetricConvolution(1,maps1,l1,l1,l1,s1,s1,s1))     -- converts patch**3 -> patch_l1**3
 model:add(nn.Tanh())
-model:add(nn.VolumetricMaxPooling(2,2,2))             -- patch_l1 -> patch_l1/2
-model:add(nn.VolumetricConvolution(maps1,maps2,l2,l2,l2)) -- patch_l1/2 -> patch_l2
+-- model:add(nn.VolumetricMaxPooling(2,2,2))                       -- patch_l1 -> patch_l1/2
+model:add(nn.VolumetricConvolution(maps1,maps2,l2,l2,l2,s2,s2,s2)) -- patch_l1/2 -> patch_l2
 model:add(nn.Tanh())
 model:add(nn.Reshape( maps2*patch_l2*patch_l2*patch_l2 ))
 model:add(nn.Linear(  maps2*patch_l2*patch_l2*patch_l2, HUs))
-
 model:add(nn.Dropout(0.5))
 model:add(nn.Tanh())
 model:add(nn.Linear(HUs,2))
@@ -250,6 +240,7 @@ print(string.format("Running optimization using %d batches and %d iterations per
 parameters, gradParameters = model:getParameters()
 timer = torch.Timer()
 
+
 model:training()
 for j = 1,batches do
     -- reset optimization state here
@@ -265,6 +256,8 @@ for j = 1,batches do
     -- generate random samples from training dataset
     get_tiles(minibatch,dataset,train,fov,stride,mult,true)
     
+    torch.save('dump',minibatch[1],'ascii')
+    
     load_time=timer:time().real
     --print(string.format("Data loading:%f",timer:time().real))
     timer:reset()
@@ -277,7 +270,7 @@ for j = 1,batches do
     else
      
         local avg_err=0
-        -- xlua.progress(0,iter)
+        xlua.progress(0,iter)
         for i=1,iter do
             local err, outputs
             feval = function(x)
@@ -289,9 +282,9 @@ for j = 1,batches do
                 return err, gradParameters
             end
             optim.sgd(feval, parameters, optimState)
-            -- avg_err=avg_err+err
-            -- if i%20 ==0 then xlua.progress(i,iter) end
-            print(err)
+            avg_err=avg_err+err
+            if i%20 ==0 then xlua.progress(i,iter) end
+            -- print(err)
         end
         model:clearState()
         -- torch.save(model_name,model)
@@ -300,15 +293,30 @@ for j = 1,batches do
 end
 
 model:evaluate()
-get_tiles(minibatch,dataset,test,fov,1,mult,false)
-out1=model:forward(minibatch[1])
-err1=criterion:forward(out1, minibatch[2])
-print(string.format("Error on test dataset:%e",err1))
-print(out1:size())
 
-t_out1=put_tiles(dataset[1],out1,fov,1,mult,1)
+-- don't have enogh memory to store the whole image in memory without overlaps
+-- so have to improvise
+err1=0.0
+t_out1=dataset[test][1]:clone()
+t_out2=dataset[test][2]:clone()
+range={1,2}
+minibatch=allocate_tiles(dataset[1],fov,1,1,range) -- allocate data in GPU
+print("Evaluating:")
+for i=fov+1,(t_out1:size()[1]-fov) do
+    range={i,i+1}
+    get_tiles(minibatch,dataset,test,fov,1,1,false,range)
+
+    out1=model:forward(minibatch[1])
+    err1=err1+criterion:forward(out1, minibatch[2])
+    
+    put_tiles(t_out1,out1,fov,1,1,1,range)
+    put_tiles_max(t_out2,out1,fov,1,1,range)
+end
+print(string.format("Error on test dataset:%e",err1))
+
+
 -- t_out2=put_tiles(dataset[1],out1,fov,1,2)
-t_out2=put_tiles_max(dataset[1],out1,fov,1,mult)
+
 
 -- reference
 t1=m2.minc2_file.new(hc_samples[1][1])
