@@ -4,6 +4,7 @@ from .utils   import text_type
 
 
 class minc2_file(object):
+
     # constants
     MINC2_DIM_UNKNOWN=lib.MINC2_DIM_UNKNOWN
     MINC2_DIM_X    = lib.MINC2_DIM_X
@@ -33,6 +34,20 @@ class minc2_file(object):
     # minc2 status
     MINC2_SUCCESS  = lib.MINC2_SUCCESS,
     MINC2_ERROR    = lib.MINC2_ERROR
+
+    # data types
+    __minc2_to_numpy={
+            lib.MINC2_BYTE :   'int8',
+            lib.MINC2_UBYTE :  'uint8',
+            lib.MINC2_SHORT :  'int16',
+            lib.MINC2_USHORT : 'uint16',
+            lib.MINC2_INT :    'int32',
+            lib.MINC2_UINT :   'uint32',
+            lib.MINC2_FLOAT :  'float32',
+            lib.MINC2_DOUBLE : 'float64',
+        }
+
+    __numpy_to_minc2 = {y:x for x,y in __minc2_to_numpy.iteritems()}
     
     def __init__(self,path=None):
         self._v=ffi.gc(lib.minc2_allocate0(),lib.minc2_destroy)
@@ -87,26 +102,20 @@ class minc2_file(object):
         # numpy array  defines dimensions in a slowest first fashion
         for i in range(self.ndim()):
             shape[self.ndim()-i-1]=_dims[i].length
-        dtype='float'
-        if data_type==lib.MINC2_BYTE : 
-            dtype='int8'
-        elif data_type==lib.MINC2_UBYTE : 
-            dtype='uint8'
-        elif data_type==lib.MINC2_SHORT : 
-            dtype='int16'
-        elif data_type==lib.MINC2_USHORT : 
-            dtype='uint16'
-        elif data_type==lib.MINC2_INT : 
-            dtype='int32'
-        elif data_type==lib.MINC2_UINT : 
-            dtype='uint32'
-        elif data_type==lib.MINC2_FLOAT : 
-            dtype='float32'
-        elif data_type==lib.MINC2_DOUBLE : 
-            dtype='float64'
-        else :
-            # unsupported
-            pass
+            
+            
+        dtype=None
+        
+        if data_type in minc2_file.__minc2_to_numpy:
+            dtype=minc2_file.__minc2_to_numpy[data_type]
+        elif data_type in minc2_file.__numpy_to_minc2:
+            dtype=data_type
+            data_type=minc2_file.__numpy_to_minc2[dtype]
+        elif isinstance(data_type,np.dtype):
+            dtype=data_type
+            data_type=minc2_file.__numpy_to_minc2[dtype.name]
+        else:
+            assert(False)
         buf=np.empty(shape,dtype,'C')
         lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.ctypes.data) , data_type)#
         
@@ -118,28 +127,12 @@ class minc2_file(object):
     def save_complete_volume(self,buf):
         import numpy as np
         data_type=lib.MINC2_FLOAT
-        store_type=buf.dtype
+        store_type=buf.dtype.name
         # TODO: make sure array is in "C" order
         
-        if store_type == np.dtype('int8'):
-            data_type=lib.MINC2_BYTE
-        elif store_type==np.dtype('uint8') : 
-            data_type=lib.MINC2_UBYTE
-        elif store_type==np.dtype('int16') : 
-            data_type=lib.MINC2_SHORT
-        elif store_type==np.dtype('uint8') : 
-            data_type=lib.MINC2_USHORT
-        elif store_type==np.dtype('int32') : 
-            data_type=lib.MINC2_INT
-        elif store_type == np.dtype('uint32') : 
-            data_type=lib.MINC2_UINT
-        elif store_type == np.dtype('float32') : 
-            data_type=lib.MINC2_FLOAT
-        elif store_type == np.dtype('float64') : 
-            data_type=lib.MINC2_DOUBLE
-        else:
-            # not supported
-            pass
+        assert(store_type in minc2_file.__numpy_to_minc2)
+        data_type=minc2_file.__numpy_to_minc2[store_type]
+            
         
         lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.ctypes.data),data_type)
         
