@@ -228,7 +228,39 @@ const char * minc2_dim_type_name(int minc2_dim_id);
 
 local lib = ffi.load("minc2-simple") -- for now fixed path
 
-minc2_file = {}
+minc2_file = {
+    -- minc2 constants
+    
+    -- minc2 dimensions
+    MINC2_DIM_UNKNOWN=ffi.C.MINC2_DIM_UNKNOWN,
+    MINC2_DIM_X    = ffi.C.MINC2_DIM_X,
+    MINC2_DIM_Y    = ffi.C.MINC2_DIM_Y,
+    MINC2_DIM_Z    = ffi.C.MINC2_DIM_Z,
+    MINC2_DIM_TIME = ffi.C.MINC2_DIM_TIME,
+    MINC2_DIM_VEC  = ffi.C.MINC2_DIM_VEC,
+    MINC2_DIM_END  = ffi.C.MINC2_DIM_END,
+    
+    -- minc2 data types
+    MINC2_BYTE     = ffi.C.MINC2_BYTE ,
+    MINC2_SHORT    = ffi.C.MINC2_SHORT ,
+    MINC2_INT      = ffi.C.MINC2_INT ,
+    MINC2_FLOAT    = ffi.C.MINC2_FLOAT ,
+    MINC2_DOUBLE   = ffi.C.MINC2_DOUBLE ,
+    MINC2_STRING   = ffi.C.MINC2_STRING ,
+    MINC2_UBYTE    = ffi.C.MINC2_UBYTE ,
+    MINC2_USHORT   = ffi.C.MINC2_USHORT ,
+    MINC2_UINT     = ffi.C.MINC2_UINT ,
+    MINC2_SCOMPLEX = ffi.C.MINC2_SCOMPLEX ,
+    MINC2_ICOMPLEX = ffi.C.MINC2_ICOMPLEX ,
+    MINC2_FCOMPLEX = ffi.C.MINC2_FCOMPLEX ,
+    MINC2_DCOMPLEX = ffi.C.MINC2_DCOMPLEX ,
+    MINC2_MAX_TYPE_ID=ffi.C.MINC2_MAX_TYPE_ID,
+    MINC2_UNKNOWN  = ffi.C.MINC2_UNKNOWN  ,
+
+    -- minc2 status
+    MINC2_SUCCESS  = ffi.C.MINC2_SUCCESS,
+    MINC2_ERROR    = ffi.C.MINC2_ERROR
+}
 minc2_file.__index = minc2_file
 
 function minc2_file.new(path)
@@ -276,7 +308,6 @@ end
 
 -- define a new volume
 function minc2_file:define(dims,store_type,representation_type)
-    
     assert(dims~=nil,"dims need to be defined")
     assert(store_type~=nil,"Store data type need to be set")
     assert(representation_type~=nil,"Data type need to be set")
@@ -285,7 +316,7 @@ function minc2_file:define(dims,store_type,representation_type)
         --assume user didn't provide m2.MINC2_DIM_END
         local mydims={}
         for k, v in pairs(dims) do mydims[k] = v end
-        mydims[#mydims]={id=m2.MINC2_DIM_END }
+        mydims[#mydims]={id=minc2_file.MINC2_DIM_END }
         
         dims=ffi.new("struct minc2_dimension[?]",#mydims,mydims)
     end
@@ -431,38 +462,6 @@ end
 
 -- this is all we have in the module
 return { 
-    -- minc2 constants
-    
-    -- minc2 dimensions
-    MINC2_DIM_UNKNOWN=ffi.C.MINC2_DIM_UNKNOWN,
-    MINC2_DIM_X    = ffi.C.MINC2_DIM_X,
-    MINC2_DIM_Y    = ffi.C.MINC2_DIM_Y,
-    MINC2_DIM_Z    = ffi.C.MINC2_DIM_Z,
-    MINC2_DIM_TIME = ffi.C.MINC2_DIM_TIME,
-    MINC2_DIM_VEC  = ffi.C.MINC2_DIM_VEC,
-    MINC2_DIM_END  = ffi.C.MINC2_DIM_END,
-    
-    -- minc2 data types
-    MINC2_BYTE     = ffi.C.MINC2_BYTE ,
-    MINC2_SHORT    = ffi.C.MINC2_SHORT ,
-    MINC2_INT      = ffi.C.MINC2_INT ,
-    MINC2_FLOAT    = ffi.C.MINC2_FLOAT ,
-    MINC2_DOUBLE   = ffi.C.MINC2_DOUBLE ,
-    MINC2_STRING   = ffi.C.MINC2_STRING ,
-    MINC2_UBYTE    = ffi.C.MINC2_UBYTE ,
-    MINC2_USHORT   = ffi.C.MINC2_USHORT ,
-    MINC2_UINT     = ffi.C.MINC2_UINT ,
-    MINC2_SCOMPLEX = ffi.C.MINC2_SCOMPLEX ,
-    MINC2_ICOMPLEX = ffi.C.MINC2_ICOMPLEX ,
-    MINC2_FCOMPLEX = ffi.C.MINC2_FCOMPLEX ,
-    MINC2_DCOMPLEX = ffi.C.MINC2_DCOMPLEX ,
-    MINC2_MAX_TYPE_ID=ffi.C.MINC2_MAX_TYPE_ID,
-    MINC2_UNKNOWN  = ffi.C.MINC2_UNKNOWN  ,
-
-    -- minc2 status
-    MINC2_SUCCESS  = ffi.C.MINC2_SUCCESS,
-    MINC2_ERROR    = ffi.C.MINC2_ERROR,
-    
     -- minc2 file reader/writer
     minc2_file=minc2_file 
 }
