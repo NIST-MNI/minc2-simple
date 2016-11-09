@@ -20,22 +20,24 @@ hc_samples={}
 
 
 -- mlp parameters
-HUs=100       -- number of neurons
+HUs=200       -- number of neurons
 fov=8        -- fov in pixels, patches are (fov*2)**3
-iter=100       -- number of optimization iterations, for each minibatch 
+iter=2000       -- number of optimization iterations, for each minibatch 
+
 l1=5         -- layer 1 kernel size
 s1=2         -- layer 2 stride
 l2=3         -- layer 2 kernel size
 s2=2         -- layer 2 stride
+
 maps1=32
 maps2=32
 LR=0.001      -- learning rate
 momentum=0.9 -- momentum
 WD=5e-4      -- weight decay
 train=8      -- use first N subjects for training 
-mult=1       -- how many datasets to include in a single training
+mult=2       -- how many datasets to include in a single training
 test=1      -- subject for testing
-batches=1   -- number of training batches
+batches=20   -- number of training batches
 stride=4
 -- seed RNG
 torch.manualSeed(0)
@@ -96,13 +98,9 @@ local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd,
     
     row_range=row_range or {(1+fov),(volume_sz[1]-fov)}
     
-    out_el = ( math.floor((row_range[2]-row_range[1]+stride)/stride) )*
+    out_el = ( math.floor((row_range[2]-row_range[1]+1 +stride-1)/stride) )*
              ( math.floor((volume_sz[2]-patch+stride-1)/stride) )*
              ( math.floor((volume_sz[3]-patch+stride-1)/stride) )*mult
-    
-    -- minibatch
-    -- out1=torch.Tensor(out_el,patch,patch,patch)
-    -- out2=torch.LongTensor(out_el)
     
     idx=1
     pidx={{1,1},{1,1},{1,1}}
@@ -121,9 +119,8 @@ local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd,
     
     out_image=torch.FloatTensor(out_el,1,patch,patch,patch)
     out_label=torch.ByteTensor(out_el)
-    print(out_image:size())
     for m=1,mult do
-        for i=row_range[1],row_range[1],stride do
+        for i=row_range[1],row_range[2],stride do
             for j=(1+fov),(volume_sz[2]-fov),stride do
                 for k=(1+fov),(volume_sz[3]-fov),stride do
                     
@@ -155,6 +152,7 @@ local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd,
             end
         end
     end
+    -- print(idx,out_el)
     minibatch[1]:copy(out_image)
     minibatch[2]:copy(out_label)
 end
@@ -165,7 +163,7 @@ local function allocate_tiles(ds, fov, stride,mult,row_range)
     
     row_range=row_range or {(1+fov),(volume_sz[1]-fov)}
     
-    out_el = ( math.floor((row_range[2]-row_range[1]+stride)/stride) )*
+    out_el = ( math.floor((row_range[2]-row_range[1]+1 +stride-1)/stride) )*
              ( math.floor((volume_sz[2]-patch+stride-1)/stride) )*
              ( math.floor((volume_sz[3]-patch+stride-1)/stride) )*mult
     
@@ -173,7 +171,7 @@ local function allocate_tiles(ds, fov, stride,mult,row_range)
     out1=torch.CudaTensor(out_el,1,patch,patch,patch)
     out2=torch.CudaByteTensor(out_el)
     
-    print(string.format("Training dataset:%d elements",out_el*patch*patch*patch))
+    -- print(string.format("Training dataset:%d elements",out_el*patch*patch*patch))
 
     return {out1,out2}
 end
@@ -185,20 +183,20 @@ local function put_tiles(ds, out, fov, stride, mult, ch, range)
     local patch=fov*2
     
     
-    ds[{range,{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}}] = 
-        out:float():view(mult,range[2]-range[1], volume_sz[2]-patch, volume_sz[3]-patch, 2)[{1,{},{},{},ch}]:exp()
+    ds[{range,{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}}] =  
+            out:float():view(mult,range[2]-range[1]+1, volume_sz[2]-patch, volume_sz[3]-patch, 2)[{1,{},{},{},ch}]:exp()
     
     return ds
 end
 
 local function put_tiles_max(ds, out, fov, stride,mult,range)
     
-    local volume_sz=ds[1]:size()
+    local volume_sz=ds:size()
     local patch=fov*2
     
-   
     _,ds[ {range,{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}} ] = 
-        out:float():view(mult,range[2]-range[1], volume_sz[2]-patch, volume_sz[3]-patch,2)[{1,{},{},{},{}}]:max(4)
+        out:float():view(mult,range[2]-range[1]+1, volume_sz[2]-patch, volume_sz[3]-patch,2)[{1,{},{},{},{}}]:max(4)-1
+        
     
     return ds
 end
@@ -230,7 +228,7 @@ print(model)
 model=model:cuda()
 
 criterion = nn.ClassNLLCriterion()
-criterion=criterion:cuda()
+criterion = criterion:cuda()
 
 
 minibatch=allocate_tiles(dataset[1],fov,stride,mult) -- allocate data in GPU
@@ -287,7 +285,7 @@ for j = 1,batches do
             -- print(err)
         end
         model:clearState()
-        -- torch.save(model_name,model)
+        torch.save(model_name,model)
         print(string.format("%d proc %f sec, load: %f sec, avg err:%f",j,timer:time().real,load_time,avg_err/iter))
     end
 end
@@ -297,13 +295,15 @@ model:evaluate()
 -- don't have enogh memory to store the whole image in memory without overlaps
 -- so have to improvise
 err1=0.0
-t_out1=dataset[test][1]:clone()
-t_out2=dataset[test][2]:clone()
-range={1,2}
+t_out1=dataset[test][1]:clone():zero()
+t_out2=dataset[test][2]:clone():zero()
+
+range={1,1}
 minibatch=allocate_tiles(dataset[1],fov,1,1,range) -- allocate data in GPU
 print("Evaluating:")
+xlua.progress(0,(t_out1:size()[1]-fov))
 for i=fov+1,(t_out1:size()[1]-fov) do
-    range={i,i+1}
+    range={i,i}
     get_tiles(minibatch,dataset,test,fov,1,1,false,range)
 
     out1=model:forward(minibatch[1])
@@ -311,6 +311,7 @@ for i=fov+1,(t_out1:size()[1]-fov) do
     
     put_tiles(t_out1,out1,fov,1,1,1,range)
     put_tiles_max(t_out2,out1,fov,1,1,range)
+    xlua.progress(i,(t_out1:size()[1]-fov))
 end
 print(string.format("Error on test dataset:%e",err1))
 
