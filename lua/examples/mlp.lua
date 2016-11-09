@@ -178,7 +178,7 @@ local function put_tiles_max(ds, out, fov, stride,mult)
     local out_t=torch.ByteTensor(volume_sz):fill(0)
     
     _,out_t[ {{1+fov,volume_sz[1]-fov},{1+fov,volume_sz[2]-fov},{1+fov,volume_sz[3]-fov}} ] = 
-        out:float():view(mult,volume_sz[1]-patch, volume_sz[2]-patch, volume_sz[3]-patch,2)[{1,{},{},{},{}}]:max(4)
+        out:float():view(mult,volume_sz[1]-patch, volume_sz[2]-patch, volume_sz[3]-patch,2)[{1,{},{},{},{}}]:max(4)-1
     
     return out_t
 end
@@ -258,15 +258,16 @@ for j = 1,batches do
 end
 
 mlp:evaluate()
-get_tiles(minibatch,dataset,test,fov,stride,mult,false)
+minibatch=allocate_tiles(dataset[1],fov,stride,1) -- allocate data in GPU
+get_tiles(minibatch,dataset,test,fov,stride,1,false)
 out1=mlp:forward(minibatch[1])
 err1=criterion:forward(out1, minibatch[2])
 print(string.format("Error on test dataset:%e",err1))
 print(out1:size())
 
-t_out1=put_tiles(dataset[1],out1,fov,stride,mult,1)
+t_out1=put_tiles(dataset[1],out1,fov,stride,1,1)
 -- t_out2=put_tiles(dataset[1],out1,fov,stride,2)
-t_out2=put_tiles_max(dataset[1],out1,fov,stride,mult)
+t_out2=put_tiles_max(dataset[1],out1,fov,stride,1)
 
 -- reference
 t1=m2.minc2_file.new(hc_samples[1][1])
