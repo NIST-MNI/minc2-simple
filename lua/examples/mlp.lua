@@ -67,12 +67,16 @@ t1_mean=0.0
 t1_sd=0.0
 
 print("removing mean and sd")
+
 for j=1,(#dataset) do
-    t1_mean=torch.mean(dataset[j][1])
-    t1_sd=torch.std(dataset[j][1])
+    t1_mean=t1_mean+torch.mean(dataset[j][1])
+    t1_sd=t1_sd+torch.std(dataset[j][1])
 end
+
 t1_mean=t1_mean/#dataset
 t1_sd=t1_sd/#dataset
+print(string.format("Mean=%f sd=%f",t1_mean,t1_sd))
+
 for j=1,(#dataset) do
     dataset[j][1]=(dataset[j][1]-t1_mean)/t1_sd
 end
