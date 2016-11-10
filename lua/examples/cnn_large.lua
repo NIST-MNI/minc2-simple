@@ -20,26 +20,27 @@ hc_samples={}
 
 
 -- mlp parameters
-HUs=200       -- number of neurons
-fov=8         -- fov in pixels, patches are (fov*2)**3
-iter=1000       -- number of optimization iterations, for each minibatch 
+HUs=1000      -- number of neurons
+fov=10        -- fov in pixels, patches are (fov*2)**3
+iter=2000     -- number of optimization iterations, for each minibatch 
 
 l1=5         -- layer 1 kernel size
-s1=2         -- layer 2 stride
+s1=2         -- layer 2 stride / aggregation size
 
 l2=3         -- layer 2 kernel size
-s2=2         -- layer 2 stride
+s2=2         -- layer 2 stride / aggregation size
 
 maps1=16
-maps2=32
+maps2=16
 
-LR=0.04       -- learning rate
+LR=0.02       -- learning rate
 momentum=0.9  -- momentum
 WD=5e-4       -- weight decay
-train=100     -- use first N subjects for training 
-mult=102      -- how many datasets to include in a single training
-test=120      -- subject for testing
-batches=20    -- number of training batches
+train=119     -- use first N subjects for training 
+mult=10       -- how many datasets to include in a single training
+test=120      -- subjects for testing
+batches=100   -- number of training batches
+
 stride=4
 -- seed RNG
 torch.manualSeed(0)
@@ -227,15 +228,15 @@ patch_l2=math.floor((patch_l1-l2)/s2)+1
 
 -- prepare network
 model = nn.Sequential()  -- make a multi-layer perceptron with a single output 
-model:add(nn.VolumetricConvolution(1,maps1,l1,l1,l1,1,1,1))     -- converts patch**3 -> patch_l1**3
+model:add(nn.VolumetricConvolution(1,maps1,l1,l1,l1,s1,s1,s1))     -- converts patch**3 -> patch_l1**3
 -- model:add(nn.Tanh())
 model:add(nn.ReLU(true))
-model:add(nn.VolumetricAveragePooling(s1,s1,s1))                       
--- model:add(nn.VolumetricMaxPooling(2,2,2))                       -- patch_l1 -> patch_l1/2
+-- model:add(nn.VolumetricAveragePooling(s1,s1,s1))                       
+-- model:add(nn.VolumetricMaxPooling(2,2,2))                    -- patch_l1 -> patch_l1/2
 model:add(nn.VolumetricConvolution(maps1,maps2,l2,l2,l2,1,1,1)) -- patch_l1/2 -> patch_l2
 -- model:add(nn.Tanh())
 model:add(nn.ReLU(true))
-model:add(nn.VolumetricAveragePooling(s2,s2,s2))                       
+model:add(nn.VolumetricMaxPooling(s2,s2,s2))           
 model:add(nn.Reshape( maps2*patch_l2*patch_l2*patch_l2 ))
 model:add(nn.Linear(  maps2*patch_l2*patch_l2*patch_l2, HUs))
 model:add(nn.Dropout(0.5))
