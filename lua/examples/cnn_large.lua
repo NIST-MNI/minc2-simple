@@ -318,6 +318,7 @@ else
             
             model:clearState()
             torch.save(model_name,model)
+            print(outputs:size())
             kappa=calc_kappa_inter(outputs,minibatch[2])
             print(string.format("%d proc %f sec, load: %f sec, avg err:%f, kappa:%f",j,timer:time().real,load_time,avg_err/iter,kappa))
         end
