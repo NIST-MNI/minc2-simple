@@ -20,26 +20,28 @@ hc_samples={}
 
 
 -- mlp parameters
-HUs=1000      -- number of neurons
+HUs=1024      -- number of neurons
 fov=10        -- fov in pixels, patches are (fov*2)**3
-iter=2000     -- number of optimization iterations, for each minibatch 
+iter=10000    -- number of optimization iterations, for each minibatch 
 
-l1=5         -- layer 1 kernel size
+l1=6         -- layer 1 kernel size
 s1=2         -- layer 2 stride / aggregation size
 
-l2=3         -- layer 2 kernel size
+l2=4         -- layer 2 kernel size
 s2=2         -- layer 2 stride / aggregation size
 
 maps1=16
-maps2=16
+maps2=64
 
 LR=0.02       -- learning rate
 momentum=0.9  -- momentum
 WD=5e-4       -- weight decay
 train=119     -- use first N subjects for training 
-mult=10       -- how many datasets to include in a single training
+mult=4       -- how many datasets to include in a single training
 test=120      -- subjects for testing
-batches=100   -- number of training batches
+batches=50   -- number of training batches
+
+model_variant='cnn_10_'
 
 stride=4
 -- seed RNG
@@ -205,20 +207,17 @@ local function put_tiles_max(ds, out, fov, stride,mult,range)
 end
 
 local function calc_kappa(a,b)
---     print(torch.type(a))
---     print(torch.type(b))
---     
---     print(torch.max(a),torch.min(a))
---     print(torch.sum(a))
---     
---     print(torch.max(b),torch.min(b))
---     print(torch.sum(b))
---     
---     print(torch.sum(torch.cmul(a,b)))
-    
     return 2*torch.sum( torch.cmul(a,b) ) / (torch.sum(a)+torch.sum(b))
 end
 
+local function calc_kappa_inter(a,b)
+    -- calculate intermediary kappa
+    _,_a=a:max(2) -- last dimension contains the outputs
+    _a=_a:byte()
+    b=b:byte()
+    _a:add(-1)
+    return 2.0*torch.sum( torch.cmul(_a,b) ) / (torch.sum(_a)+torch.sum(b))
+end    
 
 patch=fov*2 -- size of input chunks
 
@@ -263,7 +262,7 @@ timer = torch.Timer()
 
 
 model:training()
-final_model_name=string.format('cnn_training_%03d.t7',batches)
+final_model_name=string.format(model_variant..'training_%03d.t7',batches)
 
 if paths.filep(final_model_name) then
         model=torch.load(final_model_name)
@@ -290,7 +289,7 @@ else
         load_time=timer:time().real
         --print(string.format("Data loading:%f",timer:time().real))
         timer:reset()
-        model_name=string.format('cnn_training_%03d.t7',j)
+        model_name=string.format(model_variant..'training_%03d.t7',j)
         
         if paths.filep(model_name) then
             model=torch.load(model_name)
@@ -299,9 +298,10 @@ else
         else
         
             local avg_err=0
+            local err,outputs
             xlua.progress(0,iter)
             for i=1,iter do
-                local err, outputs
+                
                 feval = function(x)
                     model:zeroGradParameters()
                     outputs = model:forward(minibatch[1])
@@ -315,9 +315,11 @@ else
                 if i%20 ==0 then xlua.progress(i,iter) end
                 -- print(err)
             end
+            
             model:clearState()
             torch.save(model_name,model)
-            print(string.format("%d proc %f sec, load: %f sec, avg err:%f",j,timer:time().real,load_time,avg_err/iter))
+            kappa=calc_kappa_inter(outputs,minibatch[2])
+            print(string.format("%d proc %f sec, load: %f sec, avg err:%f, kappa:%f",j,timer:time().real,load_time,avg_err/iter,kappa))
         end
     end
 end
@@ -335,7 +337,7 @@ minibatch=allocate_tiles(dataset[1],fov,1,1,range) -- allocate data in GPU
 
 
 print("Evaluating")
-local f = assert(io.open('cnn_similarity.csv', 'w'))
+local f = assert(io.open(model_variant..'similarity.csv', 'w'))
 f:write("subject,error,kappa\n")
 
 t1=m2.minc2_file.new(hc_samples[1][1])
