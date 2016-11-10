@@ -1,7 +1,7 @@
-m2=require 'minc2_simple'
+require 'minc2_simple'
 
--- qqq=m2.minc2_file.new('/home/vfonov/data/viola03/models/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
-qqq=m2.minc2_file.new('/home/vfonov/mni/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
+qqq=minc2_file.new('/home/vfonov/data/viola03/models/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
+--qqq=minc2_file.new('/home/vfonov/mni/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
 print(string.format("Loaded minc %dD file",qqq:ndim()))
 dims=qqq:store_dims()
 
@@ -10,16 +10,16 @@ for i=0,(qqq:ndim()-1) do -- contrary to common LUA convention, it is 0-based
         i,dims[i].length,dims[i].id,dims[i].start,dims[i].step))
 end
 
-ooo=m2.minc2_file.new()
+ooo=minc2_file.new()
 -- will create file with same dimensions
 
 my_dims={
-    {id=m2.MINC2_DIM_X,  length=193,start=96.0,step=-1.0},
-    {id=m2.MINC2_DIM_Y,  length=229,start=-132.0,step=1.0},
-    {id=m2.MINC2_DIM_Z,  length=193,start=-78.0,step=1.0}
+    {id=minc2_file.MINC2_DIM_X,  length=193,start=96.0,step=-1.0},
+    {id=minc2_file.MINC2_DIM_Y,  length=229,start=-132.0,step=1.0},
+    {id=minc2_file.MINC2_DIM_Z,  length=193,start=-78.0,step=1.0}
 }
 
-ooo:define(my_dims, m2.MINC2_BYTE, m2.MINC2_FLOAT)
+ooo:define(my_dims, minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
 ooo:create('test_out.mnc')
 ooo:copy_metadata(qqq)
 
@@ -29,7 +29,7 @@ ooo:setup_standard_order()
 print("Loading from file...")
 
 -- load into a c buffer
-data=qqq:load_complete_volume(m2.MINC2_FLOAT)
+data=qqq:load_complete_volume(minc2_file.MINC2_FLOAT)
 
 print(string.format("loaded tensor %s of size :%s",torch.type(data),data:size()))
 

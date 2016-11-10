@@ -7,7 +7,7 @@ require "cunn"
 require "cudnn"
 require "paths"
 
-m2=require 'minc2_simple'
+require 'minc2_simple'
 
 torch.setdefaulttensortype('torch.FloatTensor')
 
@@ -53,14 +53,14 @@ dataset={}
 for _,l in pairs(hc_samples) do
     print(string.format("Opening %s %s",l[1],l[2]))
     
-    local t1=m2.minc2_file.new(l[1])
+    local t1=minc2_file.new(l[1])
     t1:setup_standard_order()
     
-    local seg=m2.minc2_file.new(l[2])
+    local seg=minc2_file.new(l[2])
     seg:setup_standard_order()
     
-    dataset[#dataset+1]={ t1:load_complete_volume(m2.MINC2_FLOAT), 
-                          seg:load_complete_volume(m2.MINC2_INT) }
+    dataset[#dataset+1]={ t1:load_complete_volume(minc2_file.MINC2_FLOAT), 
+                          seg:load_complete_volume(minc2_file.MINC2_INT) }
 end
 
 t1_mean=0.0
@@ -188,7 +188,8 @@ patch=fov*2
 
 -- prepare network
 mlp = nn.Sequential()  -- make a multi-layer perceptron with a single output (yes/no)
-mlp:add(nn.Reshape(patch*patch*patch))
+mlp:add(nn.View(-1,patch*patch*patch))
+--mlp:add(nn.Reshape(patch*patch*patch))
 mlp:add(nn.Linear(patch*patch*patch,HUs))
 mlp:add(nn.Dropout(0.5))
 mlp:add(nn.Tanh())
@@ -270,22 +271,22 @@ t_out1=put_tiles(dataset[1],out1,fov,stride,1,1)
 t_out2=put_tiles_max(dataset[1],out1,fov,stride,1)
 
 -- reference
-t1=m2.minc2_file.new(hc_samples[1][1])
-out_minc=m2.minc2_file.new()
+t1=minc2_file.new(hc_samples[1][1])
+out_minc=minc2_file.new()
 
-out_minc:define(t1:store_dims(), m2.MINC2_BYTE, m2.MINC2_FLOAT)
+out_minc:define(t1:store_dims(), minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
 out_minc:create("output1.mnc")
 out_minc:setup_standard_order()
 out_minc:save_complete_volume(t_out1)
 
-out_minc=m2.minc2_file.new()
-out_minc:define(t1:store_dims(), m2.MINC2_BYTE, m2.MINC2_BYTE)
+out_minc=minc2_file.new()
+out_minc:define(t1:store_dims(), minc2_file.MINC2_BYTE, minc2_file.MINC2_BYTE)
 out_minc:create("output2.mnc")
 out_minc:setup_standard_order()
 out_minc:save_complete_volume(t_out2)
 
-out_minc=m2.minc2_file.new()
-out_minc:define(t1:store_dims(), m2.MINC2_BYTE, m2.MINC2_FLOAT)
+out_minc=minc2_file.new()
+out_minc:define(t1:store_dims(), minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
 out_minc:create("output3.mnc")
 out_minc:setup_standard_order()
 out_minc:save_complete_volume(dataset[1][1]:float())
