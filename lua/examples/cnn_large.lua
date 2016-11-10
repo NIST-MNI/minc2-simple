@@ -20,28 +20,28 @@ hc_samples={}
 
 
 -- mlp parameters
-HUs=1024      -- number of neurons
-fov=10        -- fov in pixels, patches are (fov*2)**3
-iter=10000    -- number of optimization iterations, for each minibatch 
+HUs=200      -- number of neurons
+fov=8        -- fov in pixels, patches are (fov*2)**3
+iter=1000     -- number of optimization iterations, for each minibatch 
 
-l1=8         -- layer 1 kernel size
-s1=2         -- layer 2 stride / aggregation size
+l1=5         -- layer 1 kernel size
+s1=2         -- layer 2 aggregation size
 
-l2=4         -- layer 2 kernel size
-s2=2         -- layer 2 stride / aggregation size
+l2=3         -- layer 2 kernel size
+s2=2         -- layer 2 aggregation size
 
 maps1=16
 maps2=64
 
-LR=0.02       -- learning rate
+LR=0.04       -- learning rate
 momentum=0.9  -- momentum
 WD=5e-4       -- weight decay
 train=119     -- use first N subjects for training 
-mult=4       -- how many datasets to include in a single training
+mult=4        -- how many datasets to include in a single training
 test=120      -- subjects for testing
-batches=50   -- number of training batches
+batches=16    -- number of training batches
 
-model_variant='cnn_10_'
+model_variant='cnn_8_'
 
 stride=4
 -- seed RNG
@@ -213,24 +213,28 @@ end
 local function calc_kappa_inter(a,b)
     -- calculate intermediary kappa
     _,_a=a:max(2) -- last dimension contains the outputs
-    _a=_a:byte()
-    b=b:byte()
+    _a=_a:float()
+    _b=b:float():clone()
     _a:add(-1)
-    return 2.0*torch.sum( torch.cmul(_a,b) ) / (torch.sum(_a)+torch.sum(b))
+    _b:add(-1)
+    return 2.0*torch.sum(torch.cmul(_a,_b) ) / (torch.sum(_a)+torch.sum(_b))
 end    
 
 patch=fov*2 -- size of input chunks
 
-patch_l1=math.floor((patch - l1)/s1)+1
-patch_l2=math.floor((patch_l1-l2)/s2)+1
+patch_l1=math.floor((patch    -l1 + 1)/s1)
+patch_l2=math.floor((patch_l1 -l2 + 1)/s2)
 
+-- 2*
 
+print(string.format("patch=%d patch_l1=%d patch_l2=%d",patch,patch_l1,patch_l2))
 -- prepare network
 model = nn.Sequential()  -- make a multi-layer perceptron with a single output 
-model:add(nn.VolumetricConvolution(1,maps1,l1,l1,l1,s1,s1,s1))     -- converts patch**3 -> patch_l1**3
+model:add(nn.VolumetricConvolution(1,maps1,l1,l1,l1,1,1,1))     -- converts patch**3 -> patch_l1**3
 -- model:add(nn.Tanh())
 model:add(nn.ReLU(true))
--- model:add(nn.VolumetricAveragePooling(s1,s1,s1))                       
+model:add(nn.VolumetricAveragePooling(s1,s1,s1))                       
+-- model:add(nn.VolumetricDropout(0.5)) -- ?
 -- model:add(nn.VolumetricMaxPooling(2,2,2))                    -- patch_l1 -> patch_l1/2
 model:add(nn.VolumetricConvolution(maps1,maps2,l2,l2,l2,1,1,1)) -- patch_l1/2 -> patch_l2
 -- model:add(nn.Tanh())
@@ -284,7 +288,6 @@ else
         -- generate random samples from training dataset
         get_tiles(minibatch,dataset,train,fov,stride,mult,true)
         
-        torch.save('dump',minibatch[1],'ascii')
         
         load_time=timer:time().real
         --print(string.format("Data loading:%f",timer:time().real))
@@ -295,10 +298,14 @@ else
             model=torch.load(model_name)
             print("Loaded model:"..model_name)
             print(model)
+            kappa=calc_kappa_inter(model:forward(minibatch[1]),minibatch[2])
+            print(string.format("kappa=%f",kappa))
         else
         
             local avg_err=0
             
+            kappa0=calc_kappa_inter(model:forward(minibatch[1]),minibatch[2])
+            print(string.format("kappa0=%f",kappa0))
             xlua.progress(0,iter)
             for i=1,iter do
                 local err,outputs
