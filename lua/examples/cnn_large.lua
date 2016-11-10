@@ -149,7 +149,7 @@ local function get_tiles(minibatch, dataset, train,  fov, stride, mult, use_rnd,
                     end
                     
                     out_image[idx][1]=dataset[ rrr[idx] ][1][pidx]
-                    out_label[idx]   =dataset[ rrr[idx] ][2][{i,j,k}]+1 -- convert to 1-based class id 
+                    out_label[idx]   =dataset[ rrr[idx] ][2][{i+dx[{idx,1}],j+dx[{idx,2}],k+dx[{idx,2}]}]+1 -- convert to 1-based class id 
                     
                     idx=idx+1
                 end
