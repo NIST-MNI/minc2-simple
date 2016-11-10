@@ -298,10 +298,10 @@ else
         else
         
             local avg_err=0
-            local err,outputs
+            
             xlua.progress(0,iter)
             for i=1,iter do
-                
+                local err,outputs
                 feval = function(x)
                     model:zeroGradParameters()
                     outputs = model:forward(minibatch[1])
@@ -318,8 +318,7 @@ else
             
             model:clearState()
             torch.save(model_name,model)
-            print(outputs:size())
-            kappa=calc_kappa_inter(outputs,minibatch[2])
+            kappa=calc_kappa_inter(model:forward(minibatch[1]),minibatch[2])
             print(string.format("%d proc %f sec, load: %f sec, avg err:%f, kappa:%f",j,timer:time().real,load_time,avg_err/iter,kappa))
         end
     end
