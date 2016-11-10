@@ -89,9 +89,11 @@ typedef struct minc2_file* minc2_file_handle;
  */
 int minc2_allocate(minc2_file_handle * h);
 
+/**
+ * alternative version
+ */
 minc2_file_handle minc2_allocate0(void);
 
-int minc2_destroy(minc2_file_handle h);
 
 /** 
  * initialize minc2 file structure
@@ -103,6 +105,13 @@ int minc2_init(minc2_file_handle h);
  * will call standard free on it
  */
 int minc2_free(minc2_file_handle h);
+
+/**
+ * close minc2 file if it's open,
+ * then deallocate minc2 file structure
+ */
+int minc2_destroy(minc2_file_handle h);
+
 
 /**
  * open existing file
@@ -231,7 +240,7 @@ const char * minc2_data_type_name(int minc2_type_id);
 /**
  * return human-readable dimension name
  */
-const char * minc2_dim_type_name(int minc2_dim_id);    
+const char * minc2_dim_type_name(int minc2_dim_id); 
     """
     )
 
