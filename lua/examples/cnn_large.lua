@@ -24,7 +24,7 @@ HUs=1024      -- number of neurons
 fov=10        -- fov in pixels, patches are (fov*2)**3
 iter=10000    -- number of optimization iterations, for each minibatch 
 
-l1=6         -- layer 1 kernel size
+l1=8         -- layer 1 kernel size
 s1=2         -- layer 2 stride / aggregation size
 
 l2=4         -- layer 2 kernel size
@@ -235,8 +235,8 @@ model:add(nn.ReLU(true))
 model:add(nn.VolumetricConvolution(maps1,maps2,l2,l2,l2,1,1,1)) -- patch_l1/2 -> patch_l2
 -- model:add(nn.Tanh())
 model:add(nn.ReLU(true))
-model:add(nn.VolumetricMaxPooling(s2,s2,s2))           
-model:add(nn.Reshape( maps2*patch_l2*patch_l2*patch_l2 ))
+model:add(nn.VolumetricMaxPooling(s2,s2,s2))
+model:add(nn.View( -1,maps2*patch_l2*patch_l2*patch_l2 ))
 model:add(nn.Linear(  maps2*patch_l2*patch_l2*patch_l2, HUs))
 model:add(nn.Dropout(0.5))
 model:add(nn.ReLU(true))
