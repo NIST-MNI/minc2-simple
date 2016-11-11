@@ -56,6 +56,12 @@ struct minc2_dimension
   double dir_cos[3];     /**< direction cosines*/
 };
 
+/**
+ *
+ */
+struct minc2_info_iterator;
+typedef struct minc2_info_iterator* minc2_info_iterator_handle;
+
 
 /**
  * minc2 error codes, compatible with minc2 API
@@ -224,6 +230,55 @@ const char * minc2_data_type_name(int minc2_type_id);
  * return human-readable dimension name
  */
 const char * minc2_dim_type_name(int minc2_dim_id);
+
+
+
+/**
+ * Ititialize info iterator
+ */
+minc2_info_iterator_handle minc2_allocate_iterator(void);
+
+/**
+ * Free info iterator: stop iterator if needed and deallocate memory
+ */
+int minc2_free_iterator(minc2_info_iterator_handle it);
+
+/**
+ * Stop iterator: stop itarating , the iterator handle can be re-used for another time
+ */
+int minc2_stop_iterator(minc2_info_iterator_handle it);
+
+
+/**
+ * Start iterating over groups
+ */
+int minc2_start_group_iterator(minc2_file_handle h,minc2_info_iterator_handle group_it);
+
+/**
+ * Start iterating over attrobutes
+ */
+int minc2_start_attribute_iterator(minc2_file_handle h,const char* group,minc2_info_iterator_handle it);
+
+/**
+ * advance to next available group item
+ */
+int minc2_iterator_group_next(minc2_info_iterator_handle it);
+
+/**
+ * advance to next available attrobute item
+ */
+int minc2_iterator_attribute_next(minc2_info_iterator_handle it);
+
+/**
+ * Get current iterator contents
+ */
+const char* minc2_iterator_group_name(minc2_info_iterator_handle it);
+
+/**
+ * Get current iterator contents
+ */
+const char* minc2_iterator_attr_name(minc2_info_iterator_handle it);
+
 
 
 #ifdef __cplusplus

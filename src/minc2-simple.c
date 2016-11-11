@@ -45,6 +45,17 @@ struct minc2_file {
   misize_t      *tmp_count;
 };
 
+enum { ITERATOR_INFO_SIZE=256 };
+
+struct minc2_info_iterator
+{
+  milisthandle_t _it;
+  minc2_file_handle _minc2;
+
+  char group_name[ITERATOR_INFO_SIZE];
+  char attr_name[ITERATOR_INFO_SIZE];
+};
+
 /**
  * public functions
  */
@@ -953,6 +964,7 @@ int minc2_copy_metadata(minc2_file_handle src,minc2_file_handle dst)
       }
     milist_finish(grplist);
   } else {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Error iterating through metadata");
     return MINC2_ERROR;
   }
   /*TODO: copy history attribute, because micopy_attr doesn't copy it*/
@@ -1053,6 +1065,110 @@ static int _mitype_to_minc2_type(mitype_t t)
   /*this is identity transform at the moment*/
   return (int)t;
 }
+
+
+
+minc2_info_iterator_handle minc2_allocate_iterator(void)
+{
+  return calloc(1,sizeof(struct minc2_info_iterator));
+}
+
+
+int minc2_stop_iterator(minc2_info_iterator_handle it)
+{
+  if(!it)
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"NULL pointer");
+    return MINC2_ERROR;
+  }
+  if(!it->_it)
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Iterator not started");
+    return MINC2_ERROR;
+  }
+  milist_finish(it->_it);
+  it->_it=NULL;
+  return MINC2_SUCCESS;
+}
+
+int minc2_start_group_iterator(minc2_file_handle h,minc2_info_iterator_handle it)
+{
+  it->_minc2=h;
+  *it->group_name=0;
+  if(milist_start(it->_minc2->vol, "", 0, &it->_it) == MI_NOERROR)
+    return MINC2_SUCCESS;
+  it->_it=0;
+
+  return MINC2_ERROR;
+}
+
+int minc2_start_attribute_iterator(minc2_file_handle h,const char* group,minc2_info_iterator_handle it)
+{
+  it->_minc2=h;
+  strncpy(it->group_name,group,ITERATOR_INFO_SIZE);
+  *it->attr_name=0;
+  if(milist_start(it->_minc2->vol, it->group_name, 1, &it->_it) == MI_NOERROR)
+    return MINC2_SUCCESS;
+  it->_it=0;
+  return MINC2_ERROR;
+}
+
+int minc2_iterator_group_next(minc2_info_iterator_handle it)
+{
+  if(!it)
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"NULL pointer");
+    return MINC2_ERROR;
+  }
+  if(!it->_it)
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Iterator not started");
+    return MINC2_ERROR;
+  }
+  return milist_grp_next(it->_it, it->group_name, ITERATOR_INFO_SIZE ) == MI_NOERROR?MINC2_SUCCESS:MINC2_ERROR;
+}
+
+
+int minc2_iterator_attribute_next(minc2_info_iterator_handle it)
+{
+  if(!it)
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"NULL pointer");
+    return MINC2_ERROR;
+  }
+  if(!it->_it)
+  {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Iterator not started");
+    return MINC2_ERROR;
+  }
+
+  return milist_attr_next(it->_minc2->vol,it->_it,it->group_name,ITERATOR_INFO_SIZE,it->attr_name,ITERATOR_INFO_SIZE ) == MI_NOERROR?MINC2_SUCCESS:MINC2_ERROR;
+}
+
+const char* minc2_iterator_group_name(minc2_info_iterator_handle it)
+{
+  if(!it || !it->_it)
+    return "";
+  return it->group_name;
+}
+
+const char* minc2_iterator_attr_name(minc2_info_iterator_handle it)
+{
+  if(!it || !it->_it)
+    return "";
+  return it->attr_name;
+}
+
+
+int minc2_free_iterator(minc2_info_iterator_handle it)
+{
+  int err=MINC2_SUCCESS;
+  if(!it) return MINC2_ERROR;
+  err=minc2_stop_iterator(it);
+  free(it);
+  return err;
+}
+
 
 
 
