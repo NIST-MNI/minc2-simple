@@ -6,7 +6,6 @@ require('torch')
 
 -- contents of ../src/minc2-simple.h :
 ffi.cdef[[
-
 /**
   * minc2 dimension types
   */ 
@@ -233,21 +232,42 @@ const char * minc2_data_type_name(int minc2_type_id);
 const char * minc2_dim_type_name(int minc2_dim_id);
 
 
+/**
+ * get attribute type
+ */
+int minc2_get_attribute_type(minc2_file_handle h,const char* group,const char* attr,int *minc2_type);
+
+/**
+ * get attribute length
+ */
+int minc2_get_attribute_length(minc2_file_handle h,const char* group,const char* attr,int *attr_length);
+
+
+/**
+ * read attribute
+ */
+int minc2_read_attribute(minc2_file_handle h,const char* group,const char* attr,void *buf,int buf_size);
+
+/**
+ * write attribute
+ */
+int minc2_write_attribute(minc2_file_handle h,const char* group,const char* attr,const void *buf,int buf_size,int minc2_type);
+
 
 /**
  * Ititialize info iterator
  */
-minc2_info_iterator_handle minc2_allocate_iterator(void);
+minc2_info_iterator_handle minc2_allocate_info_iterator(void);
 
 /**
  * Free info iterator: stop iterator if needed and deallocate memory
  */
-int minc2_free_iterator(minc2_info_iterator_handle it);
+int minc2_free_info_iterator(minc2_info_iterator_handle it);
 
 /**
  * Stop iterator: stop itarating , the iterator handle can be re-used for another time
  */
-int minc2_stop_iterator(minc2_info_iterator_handle it);
+int minc2_stop_info_iterator(minc2_info_iterator_handle it);
 
 
 /**
@@ -278,7 +298,12 @@ const char* minc2_iterator_group_name(minc2_info_iterator_handle it);
 /**
  * Get current iterator contents
  */
-const char* minc2_iterator_attr_name(minc2_info_iterator_handle it);
+const char* minc2_iterator_attribute_name(minc2_info_iterator_handle it);
+
+/**
+ * generate timestamp
+ */
+char* minc2_timestamp(int argc,char **argv);
 
     ]]
 
@@ -513,6 +538,145 @@ function minc2_file:save_complete_volume(buf)
         lib.minc2_save_complete_volume(self._v,buf:storage():data(),data_type)==ffi.C.MINC2_SUCCESS
         )
     return buf
+end
+
+function minc2_file:read_attribute(group,attribute)
+    
+    local attr_type=ffi.new("int[1]")
+    local attr_length=ffi.new("int[1]")
+    local ret={}
+    local i
+    
+    assert(lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)==ffi.C.MINC2_SUCCESS)
+    assert(lib.minc2_get_attribute_length(self._v,group,attribute,attr_length)==ffi.C.MINC2_SUCCESS)
+    
+    if attr_type[0] == ffi.C.MINC2_STRING then
+        print("reading string attribute...")
+        local buf = ffi.new("uint8_t[?]", attr_length[0])
+        assert(lib.minc2_read_attribute(self._v,group,attribute,buf,attr_length[0])==ffi.C.MINC2_SUCCESS);
+        return ffi.string(buf, attr_length[0])
+    else
+        local buf
+        local dims=attr_length[0]
+        local data_type=attr_type[0]
+        
+        if data_type==ffi.C.MINC2_BYTE then 
+            buf=torch.CharTensor(dims)
+        elseif data_type==ffi.C.MINC2_UBYTE then 
+            buf=torch.ByteTensor(dims)
+        elseif data_type==ffi.C.MINC2_SHORT then 
+            buf=torch.ShortTensor(dims)
+        elseif data_type==ffi.C.MINC2_USHORT then 
+            buf=torch.ShortTensor(dims)
+        elseif data_type==ffi.C.MINC2_INT then 
+            buf=torch.IntTensor(dims)
+        elseif data_type==ffi.C.MINC2_UINT then 
+            buf=torch.IntTensor(dims)
+        elseif data_type==ffi.C.MINC2_FLOAT then 
+            buf=torch.FloatTensor(dims)
+        elseif data_type==ffi.C.MINC2_DOUBLE then 
+            buf=torch.DoubleTensor(dims)
+        else
+            assert(false,"Unsupported  yet:")
+        end
+
+        assert(lib.minc2_read_attribute(self._v,group,attribute,buf:storage():data(),attr_length[0])==ffi.C.MINC2_SUCCESS);
+        
+        return buf
+    end
+end
+
+function minc2_file:write_attribute(group,attribute,value)
+    -- local attr_type=ffi.new("int[1]")
+    -- local attr_length=ffi.new("int[1]")
+    local dtype=type(value)
+    
+    if dtype=="string" then
+        attr_type=ffi.C.MINC2_STRING
+        attr_length=#value+1
+        assert(
+            lib.minc2_write_attribute(self._v,group,attribute,ffi.cast("const char[]",value),#value+1,ffi.C.MINC2_STRING)==ffi.C.MINC2_SUCCESS
+            )
+    else
+        local _value=value
+        if dtype=="table" then 
+            _value=torch.Tensor(value)
+        elseif dtype=="number" then
+            _value=torch.Tensor(1)
+            _value[1]=value
+        end
+        
+        local store_type=torch.type(_value)
+        local data_type
+        
+        if store_type == 'torch.CharTensor' then
+            data_type=ffi.C.MINC2_BYTE
+        elseif store_type=='torch.ByteTensor' then 
+            data_type=ffi.C.MINC2_UBYTE
+        elseif store_type=='torch.ShortTensor' then 
+            data_type=ffi.C.MINC2_SHORT
+        elseif store_type=='torch.ShortTensor' then 
+            data_type=ffi.C.MINC2_USHORT
+        elseif store_type=='torch.IntTensor' then 
+            data_type=ffi.C.MINC2_INT
+        elseif store_type == 'torch.IntTensor' then 
+            data_type=ffi.C.MINC2_UINT
+        elseif store_type == 'torch.FloatTensor' then 
+            data_type=ffi.C.MINC2_FLOAT
+        elseif store_type == 'torch.DoubleTensor' then 
+            data_type=ffi.C.MINC2_DOUBLE
+        else
+            print(string.format("store_type=%s",store_type))
+            assert(false,"Unsupported  yet")
+        end
+        
+        assert(
+            lib.minc2_write_attribute(self._v,group,attribute,_value:storage():data(),_value:storage():size(),data_type)==ffi.C.MINC2_SUCCESS
+            )
+    end
+end
+
+function minc2_file:metadata()
+    local ret={}
+    
+    local group_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), minc2_free_info_iterator)
+    local attr_iterator=ffi.gc(lib.minc2_allocate_info_iterator(),minc2_free_info_iterator)
+
+    assert(lib.minc2_start_group_iterator(self._v,group_iterator)==ffi.C.MINC2_SUCCESS)
+    
+    while lib.minc2_iterator_group_next(group_iterator)==ffi.C.MINC2_SUCCESS do
+        local gname=lib.minc2_iterator_group_name(group_iterator)
+        assert(lib.minc2_start_attribute_iterator(self._v, gname, attr_iterator)==ffi.C.MINC2_SUCCESS)
+        local g={}
+        
+        while lib.minc2_iterator_attribute_next(attr_iterator)==ffi.C.MINC2_SUCCESS do
+            local aname=lib.minc2_iterator_attribute_name(attr_iterator)
+            g[ ffi.string(aname) ] = self:read_attribute(gname, aname)
+        end
+        
+        ret[ ffi.string(lib.minc2_iterator_group_name(group_iterator)) ] = g
+        lib.minc2_stop_info_iterator(attr_iterator)
+    end
+    lib.minc2_stop_info_iterator(group_iterator)
+    return ret
+end
+
+
+function minc2_file:write_metadata(m)
+    
+    local group_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), minc2_free_info_iterator)
+    local attr_iterator=ffi.gc(lib.minc2_allocate_info_iterator(),minc2_free_info_iterator)
+
+    assert(lib.minc2_start_group_iterator(self._v,group_iterator)==ffi.C.MINC2_SUCCESS)
+    local group,g
+    for group,g in pairs(m) do
+        print(type(g),#g)
+        local attr,a
+        for attr,a in pairs(g) do
+            print("Writing",group,attr,a)
+            self:write_attribute(group,attr,a)
+        end
+    end
 end
 
 

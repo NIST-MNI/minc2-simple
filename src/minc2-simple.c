@@ -4,8 +4,9 @@
 #include "minc2-simple.h"
 #include <stdlib.h>
 #include <string.h>
-#include <string.h>
 #include <limits.h>
+#include <time.h>
+
 /**
  * internal functions
  */
@@ -994,6 +995,8 @@ const char * minc2_data_type_name(int minc2_type_id)
       return "float";
     case MINC2_DOUBLE:
       return "double";
+    case MINC2_STRING:
+      return "string";
     default:
       return "Unknown";
   }
@@ -1067,27 +1070,24 @@ static int _mitype_to_minc2_type(mitype_t t)
 }
 
 
-
-minc2_info_iterator_handle minc2_allocate_iterator(void)
+minc2_info_iterator_handle minc2_allocate_info_iterator(void)
 {
   return calloc(1,sizeof(struct minc2_info_iterator));
 }
 
 
-int minc2_stop_iterator(minc2_info_iterator_handle it)
+int minc2_stop_info_iterator(minc2_info_iterator_handle it)
 {
   if(!it)
   {
     MI_LOG_ERROR(MI2_MSG_GENERIC,"NULL pointer");
     return MINC2_ERROR;
   }
-  if(!it->_it)
+  if(it->_it)
   {
-    MI_LOG_ERROR(MI2_MSG_GENERIC,"Iterator not started");
-    return MINC2_ERROR;
+    milist_finish(it->_it);
+    it->_it=NULL;
   }
-  milist_finish(it->_it);
-  it->_it=NULL;
   return MINC2_SUCCESS;
 }
 
@@ -1152,7 +1152,7 @@ const char* minc2_iterator_group_name(minc2_info_iterator_handle it)
   return it->group_name;
 }
 
-const char* minc2_iterator_attr_name(minc2_info_iterator_handle it)
+const char* minc2_iterator_attribute_name(minc2_info_iterator_handle it)
 {
   if(!it || !it->_it)
     return "";
@@ -1160,16 +1160,97 @@ const char* minc2_iterator_attr_name(minc2_info_iterator_handle it)
 }
 
 
-int minc2_free_iterator(minc2_info_iterator_handle it)
+int minc2_free_info_iterator(minc2_info_iterator_handle it)
 {
   int err=MINC2_SUCCESS;
   if(!it) return MINC2_ERROR;
-  err=minc2_stop_iterator(it);
+  err=minc2_stop_info_iterator(it);
   free(it);
   return err;
 }
 
 
+
+int minc2_get_attribute_type(minc2_file_handle h,const char* group,const char* attr,int *minc2_type)
+{
+  mitype_t    att_data_type;
+  *minc2_type=MINC2_UNKNOWN;
+  if(miget_attr_type(h->vol,group,attr,&att_data_type)== MI_NOERROR)
+  {
+    *minc2_type=_mitype_to_minc2_type(att_data_type);
+    return MINC2_SUCCESS;
+  }
+
+  return MINC2_ERROR;
+}
+
+int minc2_get_attribute_length(minc2_file_handle h,const char* group,const char* attr,int *attr_length)
+{
+  size_t      _att_length;
+  *attr_length=0;
+  if(miget_attr_length(h->vol,group,attr,&_att_length) == MI_NOERROR)
+  {
+    *attr_length=(int)_att_length;
+    return MINC2_SUCCESS;
+  }
+  return MINC2_ERROR;
+
+}
+
+
+int minc2_read_attribute(minc2_file_handle h,const char* group,const char* attr,void *buf,int buf_size)
+{
+  mitype_t    att_data_type;
+  if( miget_attr_type(h->vol,group,attr,&att_data_type)== MI_NOERROR &&
+      miget_attr_values(h->vol,att_data_type,group,attr,buf_size,buf) == MI_NOERROR )
+  {
+    return MINC2_SUCCESS;
+  }
+
+  return MINC2_ERROR;
+}
+
+int minc2_write_attribute(minc2_file_handle h,const char* group,const char* attr,const void *buf,int buf_size,int minc2_type)
+{
+  mitype_t    att_data_type=_minc2_type_to_mitype(minc2_type);
+  if(att_data_type==MINC2_UNKNOWN) return MINC2_ERROR;
+
+  if(miset_attr_values(h->vol,att_data_type,group,attr,buf_size,buf ) == MI_NOERROR)
+  {
+    return MINC2_SUCCESS;
+  }
+  return MINC2_ERROR;
+}
+
+char* minc2_timestamp(int argc,char **argv)
+{
+  char cur_time[200];
+  time_t t;
+  struct tm *tmp;
+  char *out=NULL;
+  int total_len=0;
+
+  t = time(NULL);
+  tmp = localtime(&t);
+
+  strftime(cur_time, sizeof(cur_time), "%a %b %d %T %Y>>>", tmp);
+  total_len=strlen(cur_time);
+
+  for (int i=0; i<argc; i++) {
+    total_len+=strlen(argv[i])+2;
+  }
+
+  out=malloc(total_len+1);
+  strcpy(out,cur_time);
+  /* Copy the program name and arguments */
+  for (int i=0; i<argc; i++) {
+    strcat(out,argv[i]);
+    strcat(out," ");
+  }
+  strcat(out,"\n");
+
+  return out;
+}
 
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */

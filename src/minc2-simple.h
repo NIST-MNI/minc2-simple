@@ -232,21 +232,42 @@ const char * minc2_data_type_name(int minc2_type_id);
 const char * minc2_dim_type_name(int minc2_dim_id);
 
 
+/**
+ * get attribute type
+ */
+int minc2_get_attribute_type(minc2_file_handle h,const char* group,const char* attr,int *minc2_type);
+
+/**
+ * get attribute length
+ */
+int minc2_get_attribute_length(minc2_file_handle h,const char* group,const char* attr,int *attr_length);
+
+
+/**
+ * read attribute
+ */
+int minc2_read_attribute(minc2_file_handle h,const char* group,const char* attr,void *buf,int buf_size);
+
+/**
+ * write attribute
+ */
+int minc2_write_attribute(minc2_file_handle h,const char* group,const char* attr,const void *buf,int buf_size,int minc2_type);
+
 
 /**
  * Ititialize info iterator
  */
-minc2_info_iterator_handle minc2_allocate_iterator(void);
+minc2_info_iterator_handle minc2_allocate_info_iterator(void);
 
 /**
  * Free info iterator: stop iterator if needed and deallocate memory
  */
-int minc2_free_iterator(minc2_info_iterator_handle it);
+int minc2_free_info_iterator(minc2_info_iterator_handle it);
 
 /**
  * Stop iterator: stop itarating , the iterator handle can be re-used for another time
  */
-int minc2_stop_iterator(minc2_info_iterator_handle it);
+int minc2_stop_info_iterator(minc2_info_iterator_handle it);
 
 
 /**
@@ -277,8 +298,12 @@ const char* minc2_iterator_group_name(minc2_info_iterator_handle it);
 /**
  * Get current iterator contents
  */
-const char* minc2_iterator_attr_name(minc2_info_iterator_handle it);
+const char* minc2_iterator_attribute_name(minc2_info_iterator_handle it);
 
+/**
+ * generate timestamp
+ */
+char* minc2_timestamp(int argc,char **argv);
 
 
 #ifdef __cplusplus

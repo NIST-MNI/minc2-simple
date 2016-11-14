@@ -1,7 +1,8 @@
 require 'minc2_simple'
 
-qqq=minc2_file.new('/home/vfonov/data/viola03/models/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
+--qqq=minc2_file.new('/home/vfonov/data/viola03/models/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
 --qqq=minc2_file.new('/home/vfonov/mni/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
+qqq=minc2_file.new('test_in.mnc')
 print(string.format("Loaded minc %dD file",qqq:ndim()))
 dims=qqq:store_dims()
 
@@ -19,9 +20,16 @@ my_dims={
     {id=minc2_file.MINC2_DIM_Z,  length=193,start=-78.0,step=1.0}
 }
 
+print("History:",qqq:read_attribute("","history"))
+print("Test number attribute:",qqq:read_attribute("test","att1"))
+m=qqq:metadata()
+print(m)
+
 ooo:define(my_dims, minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
 ooo:create('test_out.mnc')
-ooo:copy_metadata(qqq)
+--ooo:copy_metadata(qqq)
+print("WWW")
+ooo:write_metadata(m)
 
 -- going to read and write in standard order (XYZ)
 qqq:setup_standard_order()
