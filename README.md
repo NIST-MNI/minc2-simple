@@ -1,6 +1,10 @@
 ## Simplified MINC2 API for C,Python and LUA
 ### More interfaces to come
 
+## Goal
+To provide access to most functionality of MINC2 file format with minimal effort, with consistent interface
+
+
 
 ## Installing
 

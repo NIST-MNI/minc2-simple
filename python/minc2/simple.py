@@ -90,7 +90,7 @@ class minc2_file(object):
     
     
     def create(self,path):
-        if lib.minc2_create(self._v, path )!=lib.MINC2_SUCCESS:
+        if lib.minc2_create(self._v, to_bytes(path) )!=lib.MINC2_SUCCESS:
             raise minc2_error()
     
     def copy_metadata(self,another):
@@ -103,7 +103,7 @@ class minc2_file(object):
         buf=None
         _dims=self.representation_dims()
         # dims=torch.LongStorage(self:ndim())
-        shape=range(self.ndim())
+        shape=list(range(self.ndim()))
         # numpy array  defines dimensions in a slowest first fashion
         for i in range(self.ndim()):
             shape[self.ndim()-i-1]=_dims[i].length
@@ -149,6 +149,8 @@ class minc2_file(object):
         attr_type=ffi.new("int*",0)
         attr_length=ffi.new("int*",0)
 
+        group=to_bytes(group)
+        attribute=to_bytes(attribute)
         # assume that if we can't get attribute type, it's missing, return nil
 
         if lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)!=lib.MINC2_SUCCESS:
@@ -179,11 +181,14 @@ class minc2_file(object):
             return buf
 
     def write_attribute(self,group,attribute,value):
+        group=to_bytes(group)
+        attribute=to_bytes(attribute)
+
         if isinstance(value, text_type):
             attr_type=lib.MINC2_STRING
             attr_length=len(value)
 
-            if lib.minc2_write_attribute(self._v,group,attribute,ffi.cast("const char[]",value),attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
+            if lib.minc2_write_attribute(self._v,group,attribute,ffi.cast("const char[]",to_bytes(value)),attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
                 raise minc2_error()
         else:
             import numpy as np

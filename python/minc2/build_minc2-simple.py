@@ -4,7 +4,7 @@ from cffi import FFI
 
 ffi = FFI()
 
-minc_prefix="/opt/minc/1.9.14"
+minc_prefix="/opt/minc/1.9.13"
 source_path=os.path.join(os.path.dirname(__file__), "../../src")
 
 src=""

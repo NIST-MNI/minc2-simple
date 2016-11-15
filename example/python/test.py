@@ -3,7 +3,8 @@ import sys
 
 
 if __name__ == "__main__":
-    infile='/home/vfonov/data01/deep-seg/hc/jens_ec_lib_identity/local_model.mnc'
+    #infile='/home/vfonov/data01/deep-seg/hc/jens_ec_lib_identity/local_model.mnc'
+    infile='/opt/minc/share/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc'
     #m=minc2_file("/opt/minc/share/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc")
     m=minc2_file(infile)
     print("dims={}".format(m.ndim()))
