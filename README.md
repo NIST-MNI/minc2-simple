@@ -1,17 +1,17 @@
-== Simplified MINC2 API for C,Python and LUA
+## Simplified MINC2 API for C,Python and LUA
 
-=== More interfaces to come
+### More interfaces to come
 
 
 
-== Installing
+## Installing
 
-=== Common Requirements
+### Common Requirements
  
  * MINC2 library with headers, either by itself or as part of minc-toolkit or minc-toolkit-v2
  
 
-=== LUA
+### LUA
 
  * Requirements: torch ( http://torch.ch/ )
  * Installation:
@@ -27,7 +27,7 @@
     luarocks make
     ```
     
-=== Python
+### Python
  * Requirements: cffi, numpy
  * Installation:
     ```
