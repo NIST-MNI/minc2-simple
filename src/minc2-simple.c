@@ -1197,7 +1197,6 @@ int minc2_get_attribute_length(minc2_file_handle h,const char* group,const char*
 
 }
 
-
 int minc2_read_attribute(minc2_file_handle h,const char* group,const char* attr,void *buf,int buf_size)
 {
   mitype_t    att_data_type;
@@ -1221,6 +1220,18 @@ int minc2_write_attribute(minc2_file_handle h,const char* group,const char* attr
   }
   return MINC2_ERROR;
 }
+
+int minc2_delete_attribute(minc2_file_handle h,const char* group,const char* attr)
+{
+  return midelete_attr ( h->vol, group, attr )==MI_NOERROR?MINC2_SUCCESS:MINC2_ERROR;
+}
+
+
+int minc2_delete_group(minc2_file_handle h,const char* group)
+{
+  return midelete_group ( h->vol, "",group )==MI_NOERROR?MINC2_SUCCESS:MINC2_ERROR;
+}
+
 
 char* minc2_timestamp(int argc,char **argv)
 {

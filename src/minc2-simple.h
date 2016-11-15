@@ -242,7 +242,6 @@ int minc2_get_attribute_type(minc2_file_handle h,const char* group,const char* a
  */
 int minc2_get_attribute_length(minc2_file_handle h,const char* group,const char* attr,int *attr_length);
 
-
 /**
  * read attribute
  */
@@ -253,6 +252,15 @@ int minc2_read_attribute(minc2_file_handle h,const char* group,const char* attr,
  */
 int minc2_write_attribute(minc2_file_handle h,const char* group,const char* attr,const void *buf,int buf_size,int minc2_type);
 
+/**
+ * delete attribute
+ */
+int minc2_delete_attribute(minc2_file_handle h,const char* group,const char* attr);
+
+/**
+ * delete the whole group
+ */
+int minc2_delete_group(minc2_file_handle h,const char* group);
 
 /**
  * Ititialize info iterator

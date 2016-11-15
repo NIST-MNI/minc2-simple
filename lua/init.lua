@@ -6,6 +6,7 @@ require('torch')
 
 -- contents of ../src/minc2-simple.h :
 ffi.cdef[[
+
 /**
   * minc2 dimension types
   */ 
@@ -242,7 +243,6 @@ int minc2_get_attribute_type(minc2_file_handle h,const char* group,const char* a
  */
 int minc2_get_attribute_length(minc2_file_handle h,const char* group,const char* attr,int *attr_length);
 
-
 /**
  * read attribute
  */
@@ -253,6 +253,15 @@ int minc2_read_attribute(minc2_file_handle h,const char* group,const char* attr,
  */
 int minc2_write_attribute(minc2_file_handle h,const char* group,const char* attr,const void *buf,int buf_size,int minc2_type);
 
+/**
+ * delete attribute
+ */
+int minc2_delete_attribute(minc2_file_handle h,const char* group,const char* attr);
+
+/**
+ * delete the whole group
+ */
+int minc2_delete_group(minc2_file_handle h,const char* group);
 
 /**
  * Ititialize info iterator
@@ -480,7 +489,7 @@ function minc2_file:load_complete_volume(data_type)
     elseif data_type==ffi.C.MINC2_DOUBLE then 
         buf=torch.DoubleTensor(dims)
     else
-        assert(false,"Unsupported  yet")
+        error("Unsupported  yet")
     end
     assert( 
         lib.minc2_load_complete_volume(self._v, buf:storage():data(), data_type)==ffi.C.MINC2_SUCCESS 
@@ -531,7 +540,7 @@ function minc2_file:save_complete_volume(buf)
         data_type=ffi.C.MINC2_DOUBLE
     else
         print(string.format("store_type=%s",store_type))
-        assert(false,"Unsupported  yet")
+        error("Unsupported  yet")
     end
     
     assert(
@@ -544,10 +553,13 @@ function minc2_file:read_attribute(group,attribute)
     
     local attr_type=ffi.new("int[1]")
     local attr_length=ffi.new("int[1]")
-    local ret={}
-    local i
     
-    assert(lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)==ffi.C.MINC2_SUCCESS)
+    -- assume that if we can't get attribute type, it's missing, return nil
+    
+    if lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)~=ffi.C.MINC2_SUCCESS then
+        return nil
+    end
+    
     assert(lib.minc2_get_attribute_length(self._v,group,attribute,attr_length)==ffi.C.MINC2_SUCCESS)
     
     if attr_type[0] == ffi.C.MINC2_STRING then
@@ -577,7 +589,7 @@ function minc2_file:read_attribute(group,attribute)
         elseif data_type==ffi.C.MINC2_DOUBLE then 
             buf=torch.DoubleTensor(dims)
         else
-            assert(false,"Unsupported  yet:")
+            error("Unsupported  yet:"..data_type)
         end
 
         assert(lib.minc2_read_attribute(self._v,group,attribute,buf:storage():data(),attr_length[0])==ffi.C.MINC2_SUCCESS);
@@ -626,8 +638,7 @@ function minc2_file:write_attribute(group,attribute,value)
         elseif store_type == 'torch.DoubleTensor' then 
             data_type=ffi.C.MINC2_DOUBLE
         else
-            print(string.format("store_type=%s",store_type))
-            assert(false,"Unsupported  yet")
+            error("Unsupported  yet:"..store_type)
         end
         
         assert(
@@ -670,10 +681,8 @@ function minc2_file:write_metadata(m)
     assert(lib.minc2_start_group_iterator(self._v,group_iterator)==ffi.C.MINC2_SUCCESS)
     local group,g
     for group,g in pairs(m) do
-        print(type(g),#g)
         local attr,a
         for attr,a in pairs(g) do
-            print("Writing",group,attr,a)
             self:write_attribute(group,attr,a)
         end
     end
