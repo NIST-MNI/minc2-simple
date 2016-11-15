@@ -1,18 +1,27 @@
 ## Simplified MINC2 API for C,Python and LUA
-
 ### More interfaces to come
-
 
 
 ## Installing
 
 ### Common Requirements
- 
- * MINC2 library with headers, either by itself or as part of minc-toolkit or minc-toolkit-v2
+ * MINC2 library with headers, either by itself or as part of minc-toolkit or minc-toolkit-v2, see http://bic-mni.github.io/
  
 
+### C
+ * Requirements: cmake
+ * Installation:
+    ```
+    mkdir build
+    cmake .. 
+    make 
+    ```
+ * If location of minc2 library is not found:
+    ```
+    cmake -DLIBMINC_DIR:PATH=<location of libminc>
+    ```
+ 
 ### LUA
-
  * Requirements: torch ( http://torch.ch/ )
  * Installation:
     ```
@@ -35,5 +44,4 @@
     python setup.py install 
     ```
  * If libminc is not found: edit `python/minc2/build_minc2-simple.py` and set `minc_prefix`
- 
- 
+
