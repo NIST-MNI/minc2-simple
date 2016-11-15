@@ -9,7 +9,7 @@ ffi.cdef[[
 
 /**
   * minc2 dimension types
-  */ 
+  */
 enum  minc2_dimensions {
   MINC2_DIM_UNKNOWN=0,
   MINC2_DIM_X,
@@ -69,12 +69,12 @@ typedef struct minc2_info_iterator* minc2_info_iterator_handle;
  */
 enum { MINC2_SUCCESS=0,MINC2_ERROR=-1};
 /** Opaque structure representing minc2 file
- * 
+ *
  */
 struct minc2_file;
-typedef struct minc2_file* minc2_file_handle; 
+typedef struct minc2_file* minc2_file_handle;
 
-/** 
+/**
  * allocate empty minc2 file structure, no need to call minc2_init after
  */
 int minc2_allocate(minc2_file_handle * h);
@@ -85,12 +85,12 @@ int minc2_allocate(minc2_file_handle * h);
 minc2_file_handle minc2_allocate0(void);
 
 
-/** 
+/**
  * initialize minc2 file structure
  */
 int minc2_init(minc2_file_handle h);
 
-/** 
+/**
  * deallocate minc2 file structure
  * will call standard free on it
  */
@@ -145,7 +145,7 @@ int minc2_data_type(minc2_file_handle h,int *_type);
 int minc2_storage_data_type(minc2_file_handle h,int *_type);
 
 /**
- * query number of slice dimensions 
+ * query number of slice dimensions
  */
 int minc2_slice_ndim(minc2_file_handle h,int *slice_ndim);
 
@@ -184,7 +184,7 @@ int minc2_set_scaling(minc2_file_handle h,int use_global_scaling,int use_slice_s
 
 /**
  * Specify volume range, only when using hyperslab writing
- * Implies no slice scaling 
+ * Implies no slice scaling
  */
 int minc2_set_volume_range(minc2_file_handle h,double value_min,double value_max);
 
@@ -502,7 +502,6 @@ function minc2_file:setup_standard_order()
     assert( lib.minc2_setup_standard_order(self._v) == ffi.C.MINC2_SUCCESS)
 end
 
-
 -- function minc2_file:save_complete_volume(buf,data_type)
 --     data_type=data_type or ffi.C.MINC2_FLOAT
 --     assert(buf~=nil)
@@ -555,15 +554,14 @@ function minc2_file:read_attribute(group,attribute)
     local attr_length=ffi.new("int[1]")
     
     -- assume that if we can't get attribute type, it's missing, return nil
-    
+
     if lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)~=ffi.C.MINC2_SUCCESS then
         return nil
     end
-    
+
     assert(lib.minc2_get_attribute_length(self._v,group,attribute,attr_length)==ffi.C.MINC2_SUCCESS)
-    
+
     if attr_type[0] == ffi.C.MINC2_STRING then
-        print("reading string attribute...")
         local buf = ffi.new("uint8_t[?]", attr_length[0])
         assert(lib.minc2_read_attribute(self._v,group,attribute,buf,attr_length[0])==ffi.C.MINC2_SUCCESS);
         return ffi.string(buf, attr_length[0])
@@ -650,8 +648,8 @@ end
 function minc2_file:metadata()
     local ret={}
     
-    local group_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), minc2_free_info_iterator)
-    local attr_iterator=ffi.gc(lib.minc2_allocate_info_iterator(),minc2_free_info_iterator)
+    local group_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), lib.minc2_free_info_iterator)
+    local attr_iterator=ffi.gc(lib.minc2_allocate_info_iterator(),lib.minc2_free_info_iterator)
 
     assert(lib.minc2_start_group_iterator(self._v,group_iterator)==ffi.C.MINC2_SUCCESS)
     
@@ -674,11 +672,6 @@ end
 
 
 function minc2_file:write_metadata(m)
-    
-    local group_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), minc2_free_info_iterator)
-    local attr_iterator=ffi.gc(lib.minc2_allocate_info_iterator(),minc2_free_info_iterator)
-
-    assert(lib.minc2_start_group_iterator(self._v,group_iterator)==ffi.C.MINC2_SUCCESS)
     local group,g
     for group,g in pairs(m) do
         local attr,a
@@ -694,3 +687,5 @@ return {
     -- minc2 file reader/writer
     minc2_file=minc2_file 
 }
+
+-- kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl lua

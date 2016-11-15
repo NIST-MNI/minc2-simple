@@ -3,7 +3,8 @@ import sys
 
 
 if __name__ == "__main__":
-    m=minc2_file("/opt/minc/share/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc")
+    #m=minc2_file("/opt/minc/share/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc")
+    m=minc2_file("/home/vfonov/data/viola01/me/mc_fonv7706.2007-06-14_09-42-45.Z25-03_S_nrx-t1g.mnc.gz")
     print("dims={}".format(m.ndim()))
     dims=m.store_dims()
 
@@ -19,9 +20,18 @@ if __name__ == "__main__":
         { 'id':minc2_file.MINC2_DIM_Z,  'length':193,'start':-78.0,  'step':1.0}
     ]
     print("Will define new volume...")
-    o.define(my_dims, minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
+    o.define(dims, minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
     print("Will create new volume...")
     o.create('test_out.mnc')
+    
+    meta=m.metadata()
+    
+    print("Metadata:")
+    print(repr(meta))
+    
+    print("History:")
+    print(m.read_attribute("","history"))
+    
     print("Copying metadata")
     o.copy_metadata(m)
 

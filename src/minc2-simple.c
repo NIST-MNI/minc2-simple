@@ -1212,7 +1212,7 @@ int minc2_read_attribute(minc2_file_handle h,const char* group,const char* attr,
 int minc2_write_attribute(minc2_file_handle h,const char* group,const char* attr,const void *buf,int buf_size,int minc2_type)
 {
   mitype_t    att_data_type=_minc2_type_to_mitype(minc2_type);
-  if(att_data_type==MINC2_UNKNOWN) return MINC2_ERROR;
+  if(att_data_type==MI_TYPE_UNKNOWN) return MINC2_ERROR;
 
   if(miset_attr_values(h->vol,att_data_type,group,attr,buf_size,buf ) == MI_NOERROR)
   {

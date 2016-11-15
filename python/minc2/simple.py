@@ -2,6 +2,8 @@ from ._simple import ffi,lib
 from .utils   import to_bytes
 from .utils   import text_type
 
+class minc2_error(Exception):
+    pass
 
 class minc2_file(object):
 
@@ -82,15 +84,17 @@ class minc2_file(object):
             for i,j in enumerate(dims):
                 _dims[i]=j
             _dims[len(dims)]={'id':lib.MINC2_DIM_END}
-        
-        lib.minc2_define(self._v,_dims,store_type,representation_type)
+        if lib.minc2_define(self._v,_dims,store_type,representation_type)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
     
     
     def create(self,path):
-        lib.minc2_create(self._v, path )
+        if lib.minc2_create(self._v, path )!=lib.MINC2_SUCCESS:
+            raise minc2_error()
     
     def copy_metadata(self,another):
-        lib.minc2_copy_metadata(another._v,self._v)
+        if lib.minc2_copy_metadata(another._v,self._v)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
     
     def load_complete_volume(self,data_type):
         import numpy as np
@@ -103,7 +107,6 @@ class minc2_file(object):
         for i in range(self.ndim()):
             shape[self.ndim()-i-1]=_dims[i].length
             
-            
         dtype=None
         
         if data_type in minc2_file.__minc2_to_numpy:
@@ -115,14 +118,15 @@ class minc2_file(object):
             dtype=data_type
             data_type=minc2_file.__numpy_to_minc2[dtype.name]
         else:
-            assert(False)
+            raise minc2_error()
         buf=np.empty(shape,dtype,'C')
-        lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.ctypes.data) , data_type)#
-        
+        if lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.ctypes.data) , data_type)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
         return buf
-    
+
     def setup_standard_order(self):
-        lib.minc2_setup_standard_order(self._v)
+        if lib.minc2_setup_standard_order(self._v)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
     
     def save_complete_volume(self,buf):
         import numpy as np
@@ -131,9 +135,94 @@ class minc2_file(object):
         # TODO: make sure array is in "C" order
         
         assert(store_type in minc2_file.__numpy_to_minc2)
+        # TODO: verify dimensions of the array
+
         data_type=minc2_file.__numpy_to_minc2[store_type]
-            
         
-        lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.ctypes.data),data_type)
-        
-        return buf
+        if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.ctypes.data),data_type)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+
+    def read_attribute(self,group,attribute):
+        import numpy as np
+
+        attr_type=ffi.new("int*",0)
+        attr_length=ffi.new("int*",0)
+
+        # assume that if we can't get attribute type, it's missing, return nil
+
+        if lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)!=lib.MINC2_SUCCESS:
+            return None
+
+        if lib.minc2_get_attribute_length(self._v,group,attribute,attr_length)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+
+        if attr_type[0] == lib.MINC2_STRING:
+            buf = ffi.new("char[]", attr_length[0])
+            if lib.minc2_read_attribute(self._v,group,attribute,buf,attr_length[0])!=lib.MINC2_SUCCESS:
+                raise minc2_error()
+            return ffi.string(buf, attr_length[0])
+        else:
+
+            data_type=attr_type[0]
+            buf=None
+            if data_type in minc2_file.__minc2_to_numpy:
+                dtype=minc2_file.__minc2_to_numpy[data_type]
+                shape=[attr_length[0]]
+                buf=np.empty(shape,dtype,'C')
+            else:
+                raise minc2_error()
+
+            if lib.minc2_read_attribute(self._v,group,attribute,ffi.cast("void *", buf.ctypes.data),attr_length[0])!=lib.MINC2_SUCCESS:
+                raise minc2_error()
+
+            return buf
+
+    def write_attribute(self,group,attribute,value):
+        if isinstance(value, text_type):
+            attr_type=lib.MINC2_STRING
+            attr_length=len(value)
+
+            if lib.minc2_write_attribute(self._v,group,attribute,ffi.cast("const char[]",value),attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
+                raise minc2_error()
+        else:
+            import numpy as np
+            data_type=lib.MINC2_FLOAT
+            store_type=buf.dtype.name
+
+            assert(store_type in minc2_file.__numpy_to_minc2)
+            data_type=minc2_file.__numpy_to_minc2[store_type]
+
+            if lib.minc2_write_attribute(self._v,group,attribute,ffi.cast("void *", buf.ctypes.data),buf.size,data_type)!=lib.MINC2_SUCCESS:
+                raise minc2_error()
+
+    def metadata(self):
+        ret={}
+
+        group_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), lib.minc2_free_info_iterator)
+        attr_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), lib.minc2_free_info_iterator)
+
+        if lib.minc2_start_group_iterator(self._v,group_iterator)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+
+        while lib.minc2_iterator_group_next(group_iterator)==lib.MINC2_SUCCESS:
+            gname=lib.minc2_iterator_group_name(group_iterator)
+            if lib.minc2_start_attribute_iterator(self._v, gname, attr_iterator)!=lib.MINC2_SUCCESS:
+                raise minc2_error()
+            g={}
+
+            while lib.minc2_iterator_attribute_next(attr_iterator)==lib.MINC2_SUCCESS:
+                aname=lib.minc2_iterator_attribute_name(attr_iterator)
+                g[ ffi.string(aname) ] = self.read_attribute(gname, aname)
+
+            ret[ ffi.string(lib.minc2_iterator_group_name(group_iterator)) ] = g
+            lib.minc2_stop_info_iterator(attr_iterator)
+
+        lib.minc2_stop_info_iterator(group_iterator)
+        return ret
+
+    def write_metadata(self,m):
+        for group,g in m.iteritems():
+            for attr,a in g.iteritems():
+                self.write_attribute(group,attr,a)
+
+# kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl python; show-tabs on
