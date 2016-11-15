@@ -1,6 +1,7 @@
 from ._simple import ffi,lib
 from .utils   import to_bytes
 from .utils   import text_type
+import six
 
 class minc2_error(Exception):
     pass
@@ -49,7 +50,7 @@ class minc2_file(object):
             lib.MINC2_DOUBLE : 'float64',
         }
 
-    __numpy_to_minc2 = {y:x for x,y in __minc2_to_numpy.iteritems()}
+    __numpy_to_minc2 = {y:x for x,y in six.iteritems(__minc2_to_numpy)}
     
     def __init__(self,path=None):
         self._v=ffi.gc(lib.minc2_allocate0(),lib.minc2_destroy)
@@ -221,8 +222,8 @@ class minc2_file(object):
         return ret
 
     def write_metadata(self,m):
-        for group,g in m.iteritems():
-            for attr,a in g.iteritems():
+        for group,g in six.iteritems(m):
+            for attr,a in six.iteritems(g):
                 self.write_attribute(group,attr,a)
 
 # kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl python; show-tabs on

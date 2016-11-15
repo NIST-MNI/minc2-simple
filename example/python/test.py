@@ -3,8 +3,9 @@ import sys
 
 
 if __name__ == "__main__":
+    infile='/home/vfonov/data01/deep-seg/hc/jens_ec_lib_identity/local_model.mnc'
     #m=minc2_file("/opt/minc/share/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc")
-    m=minc2_file("/home/vfonov/data/viola01/me/mc_fonv7706.2007-06-14_09-42-45.Z25-03_S_nrx-t1g.mnc.gz")
+    m=minc2_file(infile)
     print("dims={}".format(m.ndim()))
     dims=m.store_dims()
 
