@@ -41,7 +41,7 @@ To provide access to most functionality of MINC2 file format with minimal effort
     ```
     
 ### Python
- * Requirements: cffi, numpy
+ * Requirements: cffi, numpy, six
  * Installation:
     ```
     python setup.py build

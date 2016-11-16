@@ -406,7 +406,7 @@ function minc2_file:define(dims,store_type,representation_type)
         --assume user didn't provide m2.MINC2_DIM_END
         local mydims={}
         for k, v in pairs(dims) do mydims[k] = v end
-        mydims[#mydims]={id=minc2_file.MINC2_DIM_END }
+        mydims[#mydims+1]={id=minc2_file.MINC2_DIM_END }
         
         dims=ffi.new("struct minc2_dimension[?]",#mydims,mydims)
     end
