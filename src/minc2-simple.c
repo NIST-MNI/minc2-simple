@@ -46,6 +46,15 @@ struct minc2_file {
   misize_t      *tmp_count;
 };
 
+/**
+ * internale representation of an xfm file
+ */
+struct minc2_xfm_file
+{
+  VIO_General_transform *xfm;
+};
+
+
 enum { ITERATOR_INFO_SIZE=256 };
 
 struct minc2_info_iterator

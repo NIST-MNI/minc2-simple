@@ -67,11 +67,19 @@ typedef struct minc2_info_iterator* minc2_info_iterator_handle;
  * minc2 error codes, compatible with minc2 API
  */
 enum { MINC2_SUCCESS=0,MINC2_ERROR=-1};
+
 /** Opaque structure representing minc2 file
  * 
  */
 struct minc2_file;
 typedef struct minc2_file* minc2_file_handle; 
+
+/** Opaque structure representing minc2 XFM file
+ *
+ */
+struct minc2_xfm_file;
+typedef struct minc2_xfm_file * minc2_xfm_file_handle;
+
 
 /** 
  * allocate empty minc2 file structure, no need to call minc2_init after
@@ -312,6 +320,7 @@ const char* minc2_iterator_attribute_name(minc2_info_iterator_handle it);
  * generate timestamp
  */
 char* minc2_timestamp(int argc,char **argv);
+
 
 
 #ifdef __cplusplus
