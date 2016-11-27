@@ -51,7 +51,7 @@ struct minc2_file {
  */
 struct minc2_xfm_file
 {
-  VIO_General_transform *xfm;
+  VIO_General_transform xfm;
 };
 
 
@@ -71,7 +71,7 @@ struct minc2_info_iterator
  */
 int minc2_allocate(minc2_file_handle * h)
 {
-  *h=(struct minc2_file*)calloc(1,sizeof(struct minc2_file));
+  *h=(minc2_file_handle)calloc(1,sizeof(struct minc2_file));
   return *h==NULL?MINC2_ERROR:MINC2_SUCCESS;
 }
 
@@ -82,6 +82,22 @@ minc2_file_handle minc2_allocate0(void)
     return NULL;
   return h;
 }
+
+
+int minc2_xfm_allocate(minc2_xfm_file_handle * h)
+{
+  *h=(minc2_xfm_file_handle)calloc(1,sizeof(struct minc2_xfm_file));
+  return *h==NULL?MINC2_ERROR:MINC2_SUCCESS;
+}
+
+minc2_xfm_file_handle minc2_xfm_allocate0(void)
+{
+  minc2_xfm_file_handle h;
+  if(minc2_xfm_allocate(&h) != MINC2_SUCCESS)
+    return NULL;
+  return h;
+}
+
 
 int minc2_destroy(minc2_file_handle h)
 {
@@ -97,6 +113,7 @@ int minc2_init(minc2_file_handle h)
   return MINC2_SUCCESS;
 }
 
+
 int minc2_free(minc2_file_handle h)
 {
   if(!h)
@@ -105,6 +122,23 @@ int minc2_free(minc2_file_handle h)
   free(h);
   return MINC2_SUCCESS;
 }
+
+
+int minc2_xfm_free(minc2_xfm_file_handle h)
+{
+  if(!h)
+    return MINC2_SUCCESS;
+  free(h);
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_xfm_destroy(minc2_xfm_file_handle h)
+{
+  delete_general_transform(&h->xfm);
+  return minc2_xfm_free(h);
+}
+
 
 int minc2_open(minc2_file_handle h, const char * path)
 {
@@ -316,6 +350,14 @@ int minc2_open(minc2_file_handle h, const char * path)
       return MINC2_ERROR;
   } //end of switch
 
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_xfm_open(minc2_xfm_file_handle h,const char * path)
+{
+  if(input_transform_file((char*)path, &h->xfm))
+    return MINC2_ERROR;
   return MINC2_SUCCESS;
 }
 
@@ -1272,5 +1314,20 @@ char* minc2_timestamp(int argc,char **argv)
   return out;
 }
 
+int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* out)
+{
+  return general_transform_point(&h->xfm,in[0],in[1],in[2],&out[0],&out[1],&out[2])==VIO_OK?MINC2_SUCCESS:MINC2_ERROR;
+}
+
+int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,double* out)
+{
+  return general_inverse_transform_point(&h->xfm,in[0],in[1],in[2],&out[0],&out[1],&out[2])==VIO_OK?MINC2_SUCCESS:MINC2_ERROR;
+}
+
+int minc2_xfm_invert(minc2_xfm_file_handle h)
+{
+  invert_general_transform(&h->xfm);
+  return MINC2_SUCCESS;
+}
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */

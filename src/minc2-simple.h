@@ -78,7 +78,7 @@ typedef struct minc2_file* minc2_file_handle;
  *
  */
 struct minc2_xfm_file;
-typedef struct minc2_xfm_file * minc2_xfm_file_handle;
+typedef struct minc2_xfm_file *minc2_xfm_file_handle;
 
 
 /** 
@@ -92,16 +92,38 @@ int minc2_allocate(minc2_file_handle * h);
 minc2_file_handle minc2_allocate0(void);
 
 
+/**
+ * allocate empty minc2 xfm file structure
+ */
+int minc2_xfm_allocate(minc2_xfm_file_handle * h);
+
+/**
+ * alternative version
+ */
+minc2_xfm_file_handle minc2_xfm_allocate0(void);
+
+
 /** 
  * initialize minc2 file structure
  */
 int minc2_init(minc2_file_handle h);
 
-/** 
+/**
+ * initialize minc2 xfm file structure
+ */
+int minc2_xfm_init(minc2_xfm_file_handle h);
+
+/**
  * deallocate minc2 file structure
  * will call standard free on it
  */
 int minc2_free(minc2_file_handle h);
+
+/**
+ * deallocate minc2 xfm file structure
+ * will call standard free on it
+ */
+int minc2_xfm_free(minc2_xfm_file_handle h);
 
 /**
  * close minc2 file if it's open,
@@ -109,11 +131,21 @@ int minc2_free(minc2_file_handle h);
  */
 int minc2_destroy(minc2_file_handle h);
 
+/**
+ * close minc2 xfm file if it's open,
+ * then deallocate minc2 file structure
+ */
+int minc2_xfm_destroy(minc2_xfm_file_handle h);
 
 /**
  * open existing file
  */
 int minc2_open(minc2_file_handle h,const char * path);
+
+/**
+ * open existing XFM file
+ */
+int minc2_xfm_open(minc2_xfm_file_handle h,const char * path);
 
 /**
  * define a new minc2 volume, using provided storage dimension information and storage data type
@@ -321,6 +353,20 @@ const char* minc2_iterator_attribute_name(minc2_info_iterator_handle it);
  */
 char* minc2_timestamp(int argc,char **argv);
 
+/**
+ * transform x,y,z coordinates
+ */
+int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
+
+/**
+ * invert transform x,y,z coordinates
+ */
+int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
+
+/**
+ * set flag to invert transform
+ */
+int minc2_xfm_invert(minc2_xfm_file_handle h);
 
 
 #ifdef __cplusplus
