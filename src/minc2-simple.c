@@ -1,5 +1,6 @@
 #include "minc2.h"
 #include "minc_config.h"
+#include <volume_io.h>
 
 #include "minc2-simple.h"
 #include <stdlib.h>
