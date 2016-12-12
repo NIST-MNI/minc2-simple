@@ -366,7 +366,7 @@ end
 function minc2_file:open(path)
     --print("Going to open:"..path)
     assert(path~=nil,"Provide minc2 file")
-    assert( lib.minc2_open(self._v,path)==ffi.C.MINC2_SUCCESS )
+    assert( lib.minc2_open(self._v,path) == ffi.C.MINC2_SUCCESS )
 end
 
 -- close a minc2 file

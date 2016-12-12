@@ -152,43 +152,64 @@ int minc2_open(minc2_file_handle h, const char * path)
   int n_dims;
   int i;
 
-  if ( miopen_volume(path, MI2_OPEN_READ, &h->vol) < 0 )
+  if ( miopen_volume(path, MI2_OPEN_READ, &h->vol) < 0 ) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't open minc file");
     return MINC2_ERROR;
+  }
   
-  if ( miget_volume_dimension_count(h->vol, MI_DIMCLASS_ANY, MI_DIMATTR_ALL, &n_dims)<0)
+  if ( miget_volume_dimension_count(h->vol, MI_DIMCLASS_ANY, MI_DIMATTR_ALL, &n_dims)<0) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension count");
     return MINC2_ERROR;
+  }
   
-  if( _minc2_allocate_dimensions(h,n_dims)<0)
+  if( _minc2_allocate_dimensions(h,n_dims)<0) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't allocate memory for dimensions");
     return MINC2_ERROR;
+  }
   
   if ( miget_volume_dimensions(h->vol, MI_DIMCLASS_ANY, MI_DIMATTR_ALL, MI_DIMORDER_FILE, h->ndims,
-                               h->file_dims) < 0 )
+                               h->file_dims) < 0 ){
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension info");
     return MINC2_ERROR;
+  }
   
-  if ( miget_dimension_sizes( h->file_dims, h->ndims, h->dimension_size ) < 0 )
+  if ( miget_dimension_sizes( h->file_dims, h->ndims, h->dimension_size ) < 0 ){
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension sizes");
     return MINC2_ERROR;
+  }
 
-  if ( miget_dimension_separations(h->file_dims, MI_ORDER_FILE, h->ndims, h->dimension_step) < 0 )
+  if ( miget_dimension_separations(h->file_dims, MI_ORDER_FILE, h->ndims, h->dimension_step) < 0 ) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension step");
     return MINC2_ERROR;
+  }
 
-  if ( miget_dimension_starts(h->file_dims, MI_ORDER_FILE, h->ndims, h->dimension_start) < 0 )
+  if ( miget_dimension_starts(h->file_dims, MI_ORDER_FILE, h->ndims, h->dimension_start) < 0 ) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension step");
     return MINC2_ERROR;
+  }
   
-  if ( miget_data_type(h->vol, &store_type) < 0 )
+  if ( miget_data_type(h->vol, &store_type) < 0 ) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get minc data type");
     return MINC2_ERROR;
+  }
   
   h->store_type=_mitype_to_minc2_type(store_type);
   
-  if ( miget_slice_scaling_flag(h->vol, &h->slice_scaling_flag) < 0 )
+  if ( miget_slice_scaling_flag(h->vol, &h->slice_scaling_flag) < 0 ) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get slice scaling ");
     return MINC2_ERROR;
-
-  if(miget_volume_valid_range(h->vol,&valid_max,&valid_min) < 0 )
+  }
+  if(miget_volume_valid_range(h->vol,&valid_max,&valid_min) < 0 ) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get valid range");
     return MINC2_ERROR;
+  }
 
   if( !h->slice_scaling_flag )
   {
-    if( miget_volume_range(h->vol,&volume_max,&volume_min) < 0 )
+    if( miget_volume_range(h->vol,&volume_max,&volume_min) < 0 ) {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get volume range");
       return MINC2_ERROR;
+    }
 
     h->global_scaling_flag= !(volume_min == valid_min && volume_max == valid_max);
   }
@@ -201,22 +222,35 @@ int minc2_open(minc2_file_handle h, const char * path)
     
     /*const char *_sign="+";*/
 
-    if ( miget_dimension_name(h->file_dims[i], &name) < 0 )
+    if ( miget_dimension_name(h->file_dims[i], &name) < 0 ) {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension name");
       return MINC2_ERROR;
+    }
 
     h->dimension_name[i] = name;
     
     h->store_dims[h->ndims-i-1].length=h->dimension_size[i];
     
-    miget_dimension_separation(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].step);
+    if(miget_dimension_separation(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].step)<0) {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension step");
+      return MINC2_ERROR;
+    }
     
     if(miget_dimension_cosines(h->file_dims[i],&h->store_dims[h->ndims-i-1].dir_cos[0])==MI_NOERROR)
       h->store_dims[h->ndims-i-1].have_dir_cos=1;
     else
       h->store_dims[h->ndims-i-1].have_dir_cos=0;
     
-    miget_dimension_start(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].start);
-    miget_dimension_sampling_flag(h->file_dims[i],&_sampling);
+    if(miget_dimension_start(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].start)<0)
+    {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension start");
+      return MINC2_ERROR;
+    }
+    if(miget_dimension_sampling_flag(h->file_dims[i],&_sampling)<0)
+    {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension sampling");
+      return MINC2_ERROR;
+    }
     
     h->store_dims[h->ndims-i-1].irregular=_sampling; /*documentation is wrong*/
     
@@ -256,8 +290,10 @@ int minc2_open(minc2_file_handle h, const char * path)
   /*copy store to reprenetation dimension*/
   memmove(h->representation_dims,h->store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
 
-  if ( miget_data_class(h->vol, &volume_data_class) < 0 )
+  if ( miget_data_class(h->vol, &volume_data_class) < 0 ) {
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get volume data class");
     return MINC2_ERROR;  
+  }
 
   /* set the file data type*/
   if(h->slice_scaling_flag || h->global_scaling_flag)
