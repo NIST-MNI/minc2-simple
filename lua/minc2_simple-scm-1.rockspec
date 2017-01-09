@@ -3,7 +3,7 @@ version = "scm-1"
 
 source = {
    url = "git://github.com/vfonov/minc2-simple",
-   dir = "lua"
+   dir = "minc2-simple/lua"
    
 }
 description = {
