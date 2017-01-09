@@ -1,13 +1,17 @@
 package = "minc2_simple"
 version = "scm-1"
 source = {
-   url = "..."
+   url = "https://github.com/vfonov/minc2-simple.git",
+   dir = "minc2-simple"
+   
 }
 description = {
    homepage = "https://github.com/vfonov/minc2-simple",
-   license = "BSD"
+   license = "BSD",
+   summary = "Interface for reading/writing MINC2 files"
 }
 dependencies = {}
+
 build = {
    type = "cmake",
    modules = {},
