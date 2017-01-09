@@ -2,7 +2,7 @@ package = "minc2_simple"
 version = "scm-1"
 source = {
    url = "https://github.com/vfonov/minc2-simple.git",
-   dir = "minc2-simple"
+   dir = "lua"
    
 }
 description = {
