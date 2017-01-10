@@ -1,5 +1,5 @@
 package = "minc2_simple"
-version = "scm"
+version = "scm-1"
 
 source = {
    url = "git://github.com/vfonov/minc2-simple.git",
