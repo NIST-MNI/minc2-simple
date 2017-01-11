@@ -1328,6 +1328,7 @@ char* minc2_timestamp(int argc,char **argv)
   struct tm *tmp;
   char *out=NULL;
   int total_len=0;
+  int i;
 
   t = time(NULL);
   tmp = localtime(&t);
@@ -1335,14 +1336,14 @@ char* minc2_timestamp(int argc,char **argv)
   strftime(cur_time, sizeof(cur_time), "%a %b %d %T %Y>>>", tmp);
   total_len=strlen(cur_time);
 
-  for (int i=0; i<argc; i++) {
+  for (i=0; i<argc; i++) {
     total_len+=strlen(argv[i])+2;
   }
 
   out=malloc(total_len+1);
   strcpy(out,cur_time);
   /* Copy the program name and arguments */
-  for (int i=0; i<argc; i++) {
+  for (i=0; i<argc; i++) {
     strcat(out,argv[i]);
     strcat(out," ");
   }
