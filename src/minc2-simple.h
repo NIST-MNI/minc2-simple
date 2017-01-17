@@ -42,6 +42,20 @@ enum  minc2_type {
   MINC2_UNKNOWN  = -1     /**< when the type is a record */
 };
 
+
+/**
+  * XFM type
+  */
+enum  minc2_xfm {
+  MINC2_XFM_LINEAR=1,
+  MINC2_XFM_THIN_PLATE_SPLINE,
+  MINC2_XFM_USER_TRANSFORM,
+  MINC2_XFM_CONCATENATED_TRANSFORM,
+  MINC2_XFM_GRID_TRANSFORM,
+  MINC2_XFM_END
+};
+
+
 /**
  * minc2 dimension information
  */
@@ -367,6 +381,22 @@ int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,d
  * set flag to invert transform
  */
 int minc2_xfm_invert(minc2_xfm_file_handle h);
+
+
+/**
+ * TODO:get number of concatenated xfm transforms
+ */
+int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n);
+
+/**
+ * TODO:get type of transform
+ */
+int minc2_xfm_get_type(minc2_xfm_file_handle h,int *xfm_type);
+
+/**
+ * TODO:extract n'th transform
+ */
+int minc2_xfm_get_n_transform(minc2_xfm_file_handle h,int *xfm_type);
 
 
 #ifdef __cplusplus
