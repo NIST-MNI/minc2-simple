@@ -15,24 +15,53 @@ ooo=minc2_file.new()
 -- will create file with same dimensions
 
 my_dims={
-    {id=minc2_file.MINC2_DIM_X,  length=193,start=96.0,step=-1.0},
-    {id=minc2_file.MINC2_DIM_Y,  length=229,start=-132.0,step=1.0},
-    {id=minc2_file.MINC2_DIM_Z,  length=193,start=-78.0,step=1.0}
+     {id=minc2_file.MINC2_DIM_X,  length=193,start=96.0,step=-1.0},
+     {id=minc2_file.MINC2_DIM_Y,  length=229,start=-132.0,step=1.0},
+     {id=minc2_file.MINC2_DIM_Z,  length=193,start=-78.0,step=1.0}
 }
 
 print("History:",qqq:read_attribute("","history"))
 print("Test number attribute:",qqq:read_attribute("test","att1"))
+print("Reading metadata")
 m=qqq:metadata()
+print("Metadata:")
 print(m)
 
 ooo:define(my_dims, minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
 ooo:create('test_out.mnc')
---ooo:copy_metadata(qqq)
-print("WWW")
+
+print("Writing metadata")
 ooo:write_metadata(m)
 
 -- going to read and write in standard order (XYZ)
 qqq:setup_standard_order()
+
+-- let's check coordinate transfer
+my_dims=qqq:representation_dims()
+
+ijk=torch.Tensor({0,0,0})
+xyz=qqq:voxel_to_world(ijk)
+print(string.format("Voxel %s corresponds to %s",ijk,xyz))
+
+ijk=torch.Tensor({10,10,1.5})
+xyz=qqq:voxel_to_world(ijk)
+print(string.format("Voxel %s corresponds to %s",ijk,xyz))
+
+function str(t) 
+    local s="{"..t[1]
+    local i,j
+    for i=2,#t
+        s=s..","..t[i]
+    end
+    s=s.."}"
+    return s
+end
+
+ijk={2,3,1.5}
+xyz=qqq:voxel_to_world(ijk)
+print("Voxel %s corresponds to %s")
+
+
 ooo:setup_standard_order()
 print("Loading from file...")
 

@@ -6,7 +6,6 @@ require('torch')
 
 -- contents of ../src/minc2-simple.h :
 ffi.cdef[[
-
 /**
   * minc2 dimension types
   */
@@ -43,6 +42,20 @@ enum  minc2_type {
   MINC2_UNKNOWN  = -1     /**< when the type is a record */
 };
 
+
+/**
+  * XFM type
+  */
+enum  minc2_xfm {
+  MINC2_XFM_LINEAR=1,
+  MINC2_XFM_THIN_PLATE_SPLINE,
+  MINC2_XFM_USER_TRANSFORM,
+  MINC2_XFM_CONCATENATED_TRANSFORM,
+  MINC2_XFM_GRID_TRANSFORM,
+  MINC2_XFM_END
+};
+
+
 /**
  * minc2 dimension information
  */
@@ -68,11 +81,19 @@ typedef struct minc2_info_iterator* minc2_info_iterator_handle;
  * minc2 error codes, compatible with minc2 API
  */
 enum { MINC2_SUCCESS=0,MINC2_ERROR=-1};
+
 /** Opaque structure representing minc2 file
  *
  */
 struct minc2_file;
 typedef struct minc2_file* minc2_file_handle;
+
+/** Opaque structure representing minc2 XFM file
+ *
+ */
+struct minc2_xfm_file;
+typedef struct minc2_xfm_file *minc2_xfm_file_handle;
+
 
 /**
  * allocate empty minc2 file structure, no need to call minc2_init after
@@ -90,11 +111,13 @@ minc2_file_handle minc2_allocate0(void);
  */
 int minc2_init(minc2_file_handle h);
 
+
 /**
  * deallocate minc2 file structure
  * will call standard free on it
  */
 int minc2_free(minc2_file_handle h);
+
 
 /**
  * close minc2 file if it's open,
@@ -102,11 +125,11 @@ int minc2_free(minc2_file_handle h);
  */
 int minc2_destroy(minc2_file_handle h);
 
-
 /**
  * open existing file
  */
 int minc2_open(minc2_file_handle h,const char * path);
+
 
 /**
  * define a new minc2 volume, using provided storage dimension information and storage data type
@@ -314,6 +337,74 @@ const char* minc2_iterator_attribute_name(minc2_info_iterator_handle it);
  */
 char* minc2_timestamp(int argc,char **argv);
 
+/**
+ * allocate empty minc2 xfm file structure
+ */
+int minc2_xfm_allocate(minc2_xfm_file_handle * h);
+
+/**
+ * alternative version
+ */
+minc2_xfm_file_handle minc2_xfm_allocate0(void);
+
+/**
+ * initialize minc2 xfm file structure
+ */
+int minc2_xfm_init(minc2_xfm_file_handle h);
+
+/**
+ * deallocate minc2 xfm file structure
+ * will call standard free on it
+ */
+int minc2_xfm_free(minc2_xfm_file_handle h);
+
+/**
+ * close minc2 xfm file if it's open,
+ * then deallocate minc2 file structure
+ */
+int minc2_xfm_destroy(minc2_xfm_file_handle h);
+
+/**
+ * open existing XFM file
+ */
+int minc2_xfm_open(minc2_xfm_file_handle h,const char * path);
+
+/**
+ * transform x,y,z coordinates
+ */
+int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
+
+/**
+ * invert transform x,y,z coordinates
+ */
+int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
+
+/**
+ * set flag to invert transform
+ */
+int minc2_xfm_invert(minc2_xfm_file_handle h);
+
+
+/**
+ * TODO:get number of concatenated transforms, return at least 1
+ */
+int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n);
+
+/**
+ * TODO:get type of nth transform
+ */
+int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int *xfm_type);
+
+/**
+ * TODO:extract n'th transform, if it is linear, as a 4x4 matrix
+ */
+int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix);
+
+/**
+ * TODO:extract n'th transform, if it is nonlinear, as a reference to a grid file
+ */
+int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file);
+
     ]]
 
 local lib = ffi.load("minc2-simple") -- for now fixed path
@@ -349,7 +440,14 @@ minc2_file = {
 
     -- minc2 status
     MINC2_SUCCESS  = ffi.C.MINC2_SUCCESS,
-    MINC2_ERROR    = ffi.C.MINC2_ERROR
+    MINC2_ERROR    = ffi.C.MINC2_ERROR,
+
+    -- XFM types
+    MINC2_XFM_LINEAR=ffi.C.MINC2_XFM_LINEAR,
+    MINC2_XFM_THIN_PLATE_SPLINE=ffi.MINC2_XFM_THIN_PLATE_SPLINE,
+    MINC2_XFM_USER_TRANSFORM=ffi.MINC2_XFM_USER_TRANSFORM,
+    MINC2_XFM_CONCATENATED_TRANSFORM=ffi.MINC2_XFM_CONCATENATED_TRANSFORM,
+    MINC2_XFM_GRID_TRANSFORM=ffi.MINC2_XFM_GRID_TRANSFORM
 }
 minc2_file.__index = minc2_file
 
@@ -670,7 +768,6 @@ function minc2_file:metadata()
     return ret
 end
 
-
 function minc2_file:write_metadata(m)
     local group,g
     for group,g in pairs(m) do
@@ -679,6 +776,94 @@ function minc2_file:write_metadata(m)
             self:write_attribute(group,attr,a)
         end
     end
+end
+
+function minc2_file:world_to_voxel(xyz)
+    -- convert world (X,Y,Z) coordinates to index (0-based) (i,j,k) coordinates
+    local dtype=type(xyz)
+    if dtype=="table" then -- return table too
+        local _xyz=ffi.new("double[3]",xyz)
+        local _ijk=ffi.new("double[3]")
+        assert(lib.minc2_world_to_voxel(self._v,_xyz,_ijk)==ffi.C.MINC2_SUCCESS)
+        return {_ijk[0],_ijk[1],_ijk[2]}
+    else -- assume it is a torch tensor, return tensor
+        local ijk=torch.Tensor(3)
+        assert(lib.minc2_world_to_voxel(self._v,xyz:storage():data(),ijk:storage():data())==ffi.C.MINC2_SUCCESS)
+        return ijk
+    end
+end
+
+function minc2_file:voxel_to_world(ijk)
+    -- convert index (0-based) (i,j,k) to world (X,Y,Z) coordinates
+    local dtype=type(ijk)
+    if dtype=="table" then -- return table too
+        local _xyz=ffi.new("double[3]")
+        local _ijk=ffi.new("double[3]",ijk)
+        assert(lib.minc2_voxel_to_world(self._v,_ijk,_xyz)==ffi.C.MINC2_SUCCESS)
+        return {_xyz[0],_xyz[1],_xyz[2]}
+    else -- assume it is a torch tensor, return tensor
+        local xyz=torch.Tensor(3)
+        assert(lib.minc2_voxel_to_world(self._v,ijk:storage():data(),xyz:storage():data())==ffi.C.MINC2_SUCCESS)
+        return xyz
+    end
+end
+
+
+minc2_xfm = {
+    -- XFM types
+    MINC2_XFM_LINEAR                 = ffi.C.MINC2_XFM_LINEAR,
+    MINC2_XFM_THIN_PLATE_SPLINE      = ffi.C.MINC2_XFM_THIN_PLATE_SPLINE,
+    MINC2_XFM_USER_TRANSFORM         = ffi.C.MINC2_XFM_USER_TRANSFORM,
+    MINC2_XFM_CONCATENATED_TRANSFORM = ffi.C.MINC2_XFM_CONCATENATED_TRANSFORM,
+    MINC2_XFM_GRID_TRANSFORM         = ffi.C.MINC2_XFM_GRID_TRANSFORM
+}
+minc2_xfm.__index = minc2_xfm
+
+function minc2_xfm.new(path)
+  local self = setmetatable({}, minc2_xfm)
+  self._v=ffi.gc(lib.minc2_xfm_allocate0(),lib.minc2_xfm_destroy)
+  if path~=nil then
+      self:open(path)
+  end
+  return self
+end
+
+function minc2_xfm:open(path)
+    --print("Going to open:"..path)
+    assert(path~=nil,"Provide minc2 file")
+    assert( lib.minc2_xfm_open(self._v,path) == ffi.C.MINC2_SUCCESS )
+end
+
+function minc2_xfm:transform_point(xyz_in)
+    local dtype=type(xyz_in)
+    if dtype=="table" then -- return table too
+        local _xyz_in=ffi.new("double[3]",xyz_in)
+        local _xyz_out=ffi.new("double[3]")
+        assert(lib.minc2_xfm_transform_point(self._v,_xyz_in,_xyz_out)==ffi.C.MINC2_SUCCESS)
+        return {_xyz_out[0],_xyz_out[1],_xyz_out[2]}
+    else -- assume it is a torch tensor, return tensor
+        local xyz_out=torch.Tensor(3)
+        assert(lib.minc2_xfm_transform_point(self._v,xyz_in:storage():data(),xyz_out:storage():data())==ffi.C.MINC2_SUCCESS)
+        return xyz_out
+    end
+end
+
+function minc2_xfm:inverse_transform_point(xyz_in)
+    local dtype=type(xyz_in)
+    if dtype=="table" then -- return table too
+        local _xyz_in=ffi.new("double[3]",xyz_in)
+        local _xyz_out=ffi.new("double[3]")
+        assert(lib.minc2_xfm_inverse_transform_point(self._v,_xyz_in,_xyz_out)==ffi.C.MINC2_SUCCESS)
+        return {_xyz_out[0],_xyz_out[1],_xyz_out[2]}
+    else -- assume it is a torch tensor, return tensor
+        local xyz_out=torch.Tensor(3)
+        assert(lib.minc2_xfm_inverse_transform_point(self._v,xyz_in:storage():data(),xyz_out:storage():data())==ffi.C.MINC2_SUCCESS)
+        return xyz_out
+    end
+end
+
+function minc2_xfm:invert()
+    assert(lib.minc2_xfm_invert(self._v)==ffi.C.MINC2_SUCCESS)
 end
 
 
