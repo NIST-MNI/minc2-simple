@@ -391,12 +391,6 @@ int minc2_open(minc2_file_handle h, const char * path)
 }
 
 
-int minc2_xfm_open(minc2_xfm_file_handle h,const char * path)
-{
-  if(input_transform_file((char*)path, &h->xfm))
-    return MINC2_ERROR;
-  return MINC2_SUCCESS;
-}
 
 
 int minc2_slice_ndim(minc2_file_handle h,int *slice_ndim)
@@ -1352,6 +1346,20 @@ char* minc2_timestamp(int argc,char **argv)
   return out;
 }
 
+int minc2_xfm_open(minc2_xfm_file_handle h,const char * path)
+{
+  if(input_transform_file((char*)path, &h->xfm)!=VIO_OK)
+    return MINC2_ERROR;
+  return MINC2_SUCCESS;
+}
+
+int minc2_xfm_save(minc2_xfm_file_handle h,const char * path)
+{
+  if(output_transform_file(path,(char*)"minc2-simple",&h->xfm)!=VIO_OK)
+    return MINC2_ERROR;
+  return MINC2_SUCCESS;
+}
+
 int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* out)
 {
   return general_transform_point(&h->xfm,in[0],in[1],in[2],&out[0],&out[1],&out[2])==VIO_OK?MINC2_SUCCESS:MINC2_ERROR;
@@ -1366,6 +1374,92 @@ int minc2_xfm_invert(minc2_xfm_file_handle h)
 {
   invert_general_transform(&h->xfm);
   return MINC2_SUCCESS;
+}
+
+int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n)
+{
+  switch(get_transform_type(&h->xfm))
+  {
+    default:
+      /*unsupported*/
+      *n=0;
+      return MINC2_SUCCESS;
+    case GRID_TRANSFORM:
+    case LINEAR:
+      *n=1;
+      return MINC2_SUCCESS;
+    case  CONCATENATED_TRANSFORM:
+      *n=get_n_concated_transforms(&h->xfm);
+      return MINC2_SUCCESS;
+  }
+}
+
+int _minc2_xfm_type_convert(VIO_General_transform *_xfm)
+{
+  switch(get_transform_type(_xfm))
+  {
+    case THIN_PLATE_SPLINE:
+      return MINC2_XFM_THIN_PLATE_SPLINE;
+    case GRID_TRANSFORM:
+      return MINC2_XFM_GRID_TRANSFORM;
+    case LINEAR:
+      return MINC2_XFM_LINEAR;
+    case USER_TRANSFORM:
+      return MINC2_XFM_USER_TRANSFORM;
+    default :
+      return MINC2_XFM_END; /* Unsupported ? */
+  }
+}
+
+VIO_General_transform *_get_nth_transform(VIO_General_transform *_xfm,int n)
+{
+  if( get_transform_type(_xfm)==CONCATENATED_TRANSFORM &&
+      n<get_n_concated_transforms(_xfm) )
+  {
+    return get_nth_general_transform(_xfm, n);
+  } else if(n==0) {
+    return _xfm;
+  } else
+    return NULL;
+
+}
+
+int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int n,int *xfm_type)
+{
+  VIO_General_transform *_xfm=_get_nth_transform(&h->xfm, n);
+  if(_xfm)
+  {
+    *xfm_type=_minc2_xfm_type_convert(_xfm);
+    return MINC2_SUCCESS;
+  } else {
+    return MINC2_ERROR;
+  }
+}
+
+int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix)
+{
+  VIO_General_transform *_xfm=_get_nth_transform(&h->xfm, n);
+  if(_xfm)
+  {
+    /*TODO: implement*/
+    return MINC2_ERROR;
+  } else {
+    return MINC2_ERROR;
+  }
+}
+
+int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file)
+{
+
+  VIO_General_transform *_xfm=_get_nth_transform(&h->xfm, n);
+  if(_xfm)
+  {
+    *grid_file=strdup(_xfm->displacement_volume_file);
+    *inverted=_xfm->inverse_flag;
+    return MINC2_SUCCESS;
+  } else {
+    return MINC2_ERROR;
+  }
 }
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */

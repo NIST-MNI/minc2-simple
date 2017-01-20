@@ -370,6 +370,12 @@ int minc2_xfm_destroy(minc2_xfm_file_handle h);
 int minc2_xfm_open(minc2_xfm_file_handle h,const char * path);
 
 /**
+ * save XFM  to file
+ */
+int minc2_xfm_save(minc2_xfm_file_handle h,const char * path);
+
+
+/**
  * transform x,y,z coordinates
  */
 int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
@@ -386,26 +392,25 @@ int minc2_xfm_invert(minc2_xfm_file_handle h);
 
 
 /**
- * TODO:get number of concatenated transforms, return at least 1
+ * get number of concatenated transforms, return at least 1
  */
 int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n);
 
 /**
- * TODO:get type of nth transform
+ * get type of nth transform
  */
-int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int *xfm_type);
+int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int n,int *xfm_type);
 
 /**
- * TODO:extract n'th transform, if it is linear, as a 4x4 matrix
+ * extract n'th transform, if it is linear, as a 4x4 matrix
  */
 int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix);
 
 /**
- * TODO:extract n'th transform, if it is nonlinear, as a reference to a grid file
+ * extract n'th transform, if it is nonlinear, as a reference to a grid file
  */
 int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file);
-
-    ]]
+ ]]
 
 local lib = ffi.load("minc2-simple") -- for now fixed path
 
@@ -474,7 +479,7 @@ end
 
 -- query number of dimensions
 function minc2_file:ndim()
-    dd=ffi.new("int[1]")
+    local dd=ffi.new("int[1]")
     assert(lib.minc2_ndim(self._v,dd)==ffi.C.MINC2_SUCCESS)
     return dd[0]
 end
@@ -555,7 +560,7 @@ end
 function minc2_file:load_complete_volume(data_type)
     -- will be torch tensors
     -- require('torch')
-    data_type=data_type or ffi.C.MINC2_FLOAT
+    local data_type=data_type or ffi.C.MINC2_FLOAT
     -- local buf_len=ffi.new("int[1]")
     -- lib.minc2_nelement(self._v,buf_len)
     -- buf_len=buf_len[0]
@@ -834,6 +839,13 @@ function minc2_xfm:open(path)
     assert( lib.minc2_xfm_open(self._v,path) == ffi.C.MINC2_SUCCESS )
 end
 
+function minc2_xfm:save(path)
+    --print("Going to open:"..path)
+    assert(path~=nil,"Provide minc2 file")
+    assert( lib.minc2_xfm_save(self._v,path) == ffi.C.MINC2_SUCCESS )
+end
+
+
 function minc2_xfm:transform_point(xyz_in)
     local dtype=type(xyz_in)
     if dtype=="table" then -- return table too
@@ -865,6 +877,30 @@ end
 function minc2_xfm:invert()
     assert(lib.minc2_xfm_invert(self._v)==ffi.C.MINC2_SUCCESS)
 end
+
+function minc2_xfm:get_n_concat()
+    local n=ffi.new("int[1]")
+    assert(lib.minc2_xfm_get_n_concat(self._v,n)==ffi.C.MINC2_SUCCESS)
+    return n[0]
+end
+
+function minc2_xfm:get_n_type(n)
+    local n=n or 0
+    local t=ffi.new("int[1]")
+    assert(lib.minc2_xfm_get_n_type(self._v,n,t)==ffi.C.MINC2_SUCCESS)
+    return t[0]
+end
+
+function minc2_xfm:get_grid_transform(n)
+    local n=n or 0
+    local c_file=ffi.new("char*[1]")
+    local inv=ffi.new("int[1]")
+    assert(lib.minc2_xfm_get_grid_transform(self._v,n,inv,c_file)==ffi.C.MINC2_SUCCESS)
+    local _file=ffi.string(c_file[0])
+    ffi.C.free(c_file[0])
+    return (_file,inv[0])
+end
+
 
 
 -- this is all we have in the module

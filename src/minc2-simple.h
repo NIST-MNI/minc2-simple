@@ -370,6 +370,12 @@ int minc2_xfm_destroy(minc2_xfm_file_handle h);
 int minc2_xfm_open(minc2_xfm_file_handle h,const char * path);
 
 /**
+ * save XFM  to file
+ */
+int minc2_xfm_save(minc2_xfm_file_handle h,const char * path);
+
+
+/**
  * transform x,y,z coordinates
  */
 int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
@@ -386,22 +392,22 @@ int minc2_xfm_invert(minc2_xfm_file_handle h);
 
 
 /**
- * TODO:get number of concatenated transforms, return at least 1
+ * get number of concatenated transforms, return at least 1
  */
 int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n);
 
 /**
- * TODO:get type of nth transform
+ * get type of nth transform
  */
-int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int *xfm_type);
+int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int n,int *xfm_type);
 
 /**
- * TODO:extract n'th transform, if it is linear, as a 4x4 matrix
+ * extract n'th transform, if it is linear, as a 4x4 matrix
  */
 int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix);
 
 /**
- * TODO:extract n'th transform, if it is nonlinear, as a reference to a grid file
+ * extract n'th transform, if it is nonlinear, as a reference to a grid file
  */
 int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file);
 
