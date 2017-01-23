@@ -4,13 +4,18 @@ require 'xlua'
 --qqq=minc2_file.new('/home/vfonov/data/viola03/models/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
 --qqq=minc2_file.new('/home/vfonov/mni/icbm152_model_09c/mni_icbm152_t1_tal_nlin_sym_09c.mnc')
 qqq=minc2_file.new('test_in.mnc')
-xfm=minc2_xfm.new('test.xfm')
+
+
+xfm=minc2_xfm.new()
+
+print(xfm:get_n_concat())
+
+xfm:open('test.xfm')
 print(string.format("Loaded minc %dD file",qqq:ndim()))
 -- going to read and write in standard order (XYZ)
 qqq:setup_standard_order()
 -- let's check coordinate transfer
 my_dims=qqq:representation_dims()
-
 
 
 ooo=minc2_file.new()

@@ -374,7 +374,6 @@ int minc2_xfm_open(minc2_xfm_file_handle h,const char * path);
  */
 int minc2_xfm_save(minc2_xfm_file_handle h,const char * path);
 
-
 /**
  * transform x,y,z coordinates
  */
@@ -390,7 +389,6 @@ int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,d
  */
 int minc2_xfm_invert(minc2_xfm_file_handle h);
 
-
 /**
  * get number of concatenated transforms, return at least 1
  */
@@ -402,7 +400,7 @@ int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n);
 int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int n,int *xfm_type);
 
 /**
- * extract n'th transform, if it is linear, as a 4x4 matrix
+ * extract n'th transform, if it is linear, as a 4x4 matrix , in a row-major fashion
  */
 int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix);
 
@@ -410,7 +408,18 @@ int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix)
  * extract n'th transform, if it is nonlinear, as a reference to a grid file
  */
 int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file);
- ]]
+
+
+/**
+ * Adds another  transform, a 4x4 matrix , in a row-major fashion
+ */
+int minc2_xfm_append_linear_transform(minc2_xfm_file_handle h,double *matrix);
+
+/**
+ * Adds another nonlinear grid transform
+ */
+int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_path,int inv);
+]]
 
 local lib = ffi.load("minc2-simple") -- for now fixed path
 
@@ -824,6 +833,7 @@ minc2_xfm = {
 }
 minc2_xfm.__index = minc2_xfm
 
+
 function minc2_xfm.new(path)
   local self = setmetatable({}, minc2_xfm)
   self._v=ffi.gc(lib.minc2_xfm_allocate0(),lib.minc2_xfm_destroy)
@@ -833,11 +843,13 @@ function minc2_xfm.new(path)
   return self
 end
 
+
 function minc2_xfm:open(path)
     --print("Going to open:"..path)
     assert(path~=nil,"Provide minc2 file")
     assert( lib.minc2_xfm_open(self._v,path) == ffi.C.MINC2_SUCCESS )
 end
+
 
 function minc2_xfm:save(path)
     --print("Going to open:"..path)
@@ -859,6 +871,7 @@ function minc2_xfm:transform_point(xyz_in)
         return xyz_out
     end
 end
+
 
 function minc2_xfm:inverse_transform_point(xyz_in)
     local dtype=type(xyz_in)
@@ -898,9 +911,26 @@ function minc2_xfm:get_grid_transform(n)
     assert(lib.minc2_xfm_get_grid_transform(self._v,n,inv,c_file)==ffi.C.MINC2_SUCCESS)
     local _file=ffi.string(c_file[0])
     ffi.C.free(c_file[0])
-    return (_file,inv[0])
+    return _file,inv[0]
 end
 
+function minc2_xfm:get_linear_transform(n)
+    local n=n or 0
+    local mat=torch.eye(4)
+    assert(lib.minc2_xfm_get_linear_transform(self._v,n,mat:storage():data())==ffi.C.MINC2_SUCCESS)
+    return mat
+end
+
+function minc2_xfm:append_linear_transform(mat)
+    assert(lib.minc2_xfm_append_linear_transform(self._v,mat:storage():data())==ffi.C.MINC2_SUCCESS)
+    return self
+end
+
+function minc2_xfm:append_grid_transform(grid_file,inv)
+    local inv=inv or 0
+    assert(lib.minc2_xfm_append_grid_transform(self._v,grid_file,inv)==ffi.C.MINC2_SUCCESS)
+    return self
+end
 
 
 -- this is all we have in the module

@@ -374,7 +374,6 @@ int minc2_xfm_open(minc2_xfm_file_handle h,const char * path);
  */
 int minc2_xfm_save(minc2_xfm_file_handle h,const char * path);
 
-
 /**
  * transform x,y,z coordinates
  */
@@ -390,7 +389,6 @@ int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,d
  */
 int minc2_xfm_invert(minc2_xfm_file_handle h);
 
-
 /**
  * get number of concatenated transforms, return at least 1
  */
@@ -402,7 +400,7 @@ int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n);
 int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int n,int *xfm_type);
 
 /**
- * extract n'th transform, if it is linear, as a 4x4 matrix
+ * extract n'th transform, if it is linear, as a 4x4 matrix , in a row-major fashion
  */
 int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix);
 
@@ -410,6 +408,17 @@ int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix)
  * extract n'th transform, if it is nonlinear, as a reference to a grid file
  */
 int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file);
+
+
+/**
+ * Adds another  transform, a 4x4 matrix , in a row-major fashion
+ */
+int minc2_xfm_append_linear_transform(minc2_xfm_file_handle h,double *matrix);
+
+/**
+ * Adds another nonlinear grid transform
+ */
+int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_path,int inv);
 
 
 #ifdef __cplusplus

@@ -85,19 +85,6 @@ minc2_file_handle minc2_allocate0(void)
 }
 
 
-int minc2_xfm_allocate(minc2_xfm_file_handle * h)
-{
-  *h=(minc2_xfm_file_handle)calloc(1,sizeof(struct minc2_xfm_file));
-  return *h==NULL?MINC2_ERROR:MINC2_SUCCESS;
-}
-
-minc2_xfm_file_handle minc2_xfm_allocate0(void)
-{
-  minc2_xfm_file_handle h;
-  if(minc2_xfm_allocate(&h) != MINC2_SUCCESS)
-    return NULL;
-  return h;
-}
 
 
 int minc2_destroy(minc2_file_handle h)
@@ -122,22 +109,6 @@ int minc2_free(minc2_file_handle h)
   _minc2_cleanup_dimensions(h);
   free(h);
   return MINC2_SUCCESS;
-}
-
-
-int minc2_xfm_free(minc2_xfm_file_handle h)
-{
-  if(!h)
-    return MINC2_SUCCESS;
-  free(h);
-  return MINC2_SUCCESS;
-}
-
-
-int minc2_xfm_destroy(minc2_xfm_file_handle h)
-{
-  delete_general_transform(&h->xfm);
-  return minc2_xfm_free(h);
 }
 
 
@@ -1346,6 +1317,38 @@ char* minc2_timestamp(int argc,char **argv)
   return out;
 }
 
+
+int minc2_xfm_allocate(minc2_xfm_file_handle * h)
+{
+  *h=(minc2_xfm_file_handle)calloc(1,sizeof(struct minc2_xfm_file));
+  return *h==NULL?MINC2_ERROR:MINC2_SUCCESS;
+}
+
+minc2_xfm_file_handle minc2_xfm_allocate0(void)
+{
+  minc2_xfm_file_handle h;
+  if(minc2_xfm_allocate(&h) != MINC2_SUCCESS)
+    return NULL;
+  return h;
+}
+
+
+int minc2_xfm_free(minc2_xfm_file_handle h)
+{
+  if(!h)
+    return MINC2_SUCCESS;
+  free(h);
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_xfm_destroy(minc2_xfm_file_handle h)
+{
+  delete_general_transform(&h->xfm);
+  return minc2_xfm_free(h);
+}
+
+
 int minc2_xfm_open(minc2_xfm_file_handle h,const char * path)
 {
   if(input_transform_file((char*)path, &h->xfm)!=VIO_OK)
@@ -1378,6 +1381,13 @@ int minc2_xfm_invert(minc2_xfm_file_handle h)
 
 int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n)
 {
+  /*heuristic check if transform is empty*/
+  if(h->xfm.type==0 && h->xfm.linear_transform==0)
+  {
+    *n=0;
+    return MINC2_SUCCESS;
+  }
+
   switch(get_transform_type(&h->xfm))
   {
     default:
@@ -1438,11 +1448,21 @@ int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int n,int *xfm_type)
 
 int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix)
 {
+  int i,j;
+  VIO_Transform *lin;
   VIO_General_transform *_xfm=_get_nth_transform(&h->xfm, n);
   if(_xfm)
   {
-    /*TODO: implement*/
-    return MINC2_ERROR;
+    lin=get_linear_transform_ptr(_xfm);
+
+    for(j = 0; j < 4; ++j)
+    {
+      for(i = 0; i < 4; ++i)
+      {
+        matrix[j*4+i]=Transform_elem(*lin,j,i);
+      }
+    }
+    return MINC2_SUCCESS;
   } else {
     return MINC2_ERROR;
   }
@@ -1459,6 +1479,72 @@ int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,cha
     return MINC2_SUCCESS;
   } else {
     return MINC2_ERROR;
+  }
+}
+
+int minc2_xfm_append_linear_transform(minc2_xfm_file_handle h,double *matrix)
+{
+  int n;
+  int i,j;
+  VIO_Transform lin;
+  memset(&lin, 0, sizeof(VIO_Transform));
+
+  for(j = 0; j < 4; ++j)
+  {
+    for(i = 0; i < 4; ++i)
+    {
+      Transform_elem(lin,j,i)=matrix[j*4+i];
+    }
+  }
+  minc2_xfm_get_n_concat(h,&n);
+
+  if(n==0) /*first transform*/
+  {
+    create_linear_transform(&h->xfm, &lin);
+    return MINC2_SUCCESS;
+  } else {
+    VIO_General_transform lin_xfm;
+    VIO_General_transform concated;
+
+    memset(&lin_xfm, 0, sizeof(VIO_General_transform));
+    create_linear_transform(&lin_xfm, &lin);
+
+    concat_general_transforms( &h->xfm, &lin_xfm, &concated );
+    delete_general_transform( &h->xfm );
+    delete_general_transform( &lin_xfm );
+    h->xfm = concated;
+    return MINC2_SUCCESS;
+  }
+}
+
+int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_path,int inv)
+{
+  int n;
+  VIO_General_transform *_xfm;
+  minc2_xfm_get_n_concat(h,&n);
+
+  /*TODO: create another function that will work with volume*/
+  if(n==0)
+  {
+    create_grid_transform_no_copy( &h->xfm, 0, 0 );
+    if(inv) h->xfm.inverse_flag=TRUE;
+    return MINC2_SUCCESS;
+  }
+  else
+  {
+    VIO_General_transform concated;
+    VIO_General_transform nl_xfm;
+
+    memset(&nl_xfm, 0, sizeof(VIO_General_transform));
+    create_grid_transform_no_copy( &nl_xfm, 0, 0 );
+    if(inv) nl_xfm.inverse_flag=TRUE;
+
+    concat_general_transforms( &h->xfm, &nl_xfm, &concated );
+    delete_general_transform( &h->xfm );
+    delete_general_transform( &nl_xfm );
+
+    h->xfm = concated;
+    return MINC2_SUCCESS;
   }
 }
 
