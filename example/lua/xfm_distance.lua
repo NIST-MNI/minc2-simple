@@ -23,8 +23,8 @@ if xfm_file2 then
 end
 
 
-local edges={ {-96,-132, -78},
-              {97, 97, 115}
+local edges={ {-60,-94, -52},
+              { 60, 50, 78}
             }
 
 
