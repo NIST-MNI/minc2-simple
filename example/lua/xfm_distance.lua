@@ -15,9 +15,11 @@ if xfm_file2 then
     local xfm2=minc2_xfm.new(xfm_file2)
     
     --concatenate inverted xfm2
-    xfm2:invert()
-    
+    xfm:invert()
     xfm:concat_xfm(xfm2)
+--    xfm2:invert()
+    
+--    xfm:concat_xfm(xfm2)
 end
 
 
