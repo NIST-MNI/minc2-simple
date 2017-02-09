@@ -421,6 +421,11 @@ int minc2_xfm_append_linear_transform(minc2_xfm_file_handle h,double *matrix);
 int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_path,int inv);
 
 
+/**
+ * Concatenate another general xfm transform
+ */
+int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus defined */

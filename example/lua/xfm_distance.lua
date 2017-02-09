@@ -4,26 +4,27 @@ require 'minc2_simple'
 -- require 'torch'
 require 'math'
 
-local xfm_file=arg[1]
-local ref=arg[2]
+local xfm_file1=arg[1]
+local xfm_file2=arg[2]
 
 
+local xfm=minc2_xfm.new(xfm_file1)
 
---minc2_xfm
---print(arg)
 
-local xfm=minc2_xfm.new(xfm_file)
+if xfm_file2 then
+    local xfm2=minc2_xfm.new(xfm_file2)
+    
+    --concatenate inverted xfm2
+    xfm2:invert()
+    
+    xfm:concat_xfm(xfm2)
+end
+
 
 local edges={ {-96,-132, -78},
               {97, 97, 115}
             }
 
-if ref then
-  --print("Using:"..ref)
-  
-else
-  --print("Using xfm directly")
-end
 
 
 local x,y,z
@@ -45,6 +46,6 @@ for x=1,2 do
     end
 end
 
-print("Max dist:"..max_dist)
+print(max_dist)
 
 

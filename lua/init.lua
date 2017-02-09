@@ -6,6 +6,7 @@ require('torch')
 
 -- contents of ../src/minc2-simple.h :
 ffi.cdef[[
+
 /**
   * minc2 dimension types
   */
@@ -419,6 +420,12 @@ int minc2_xfm_append_linear_transform(minc2_xfm_file_handle h,double *matrix);
  * Adds another nonlinear grid transform
  */
 int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_path,int inv);
+
+
+/**
+ * Concatenate another general xfm transform
+ */
+int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
 ]]
 
 local lib = ffi.load("minc2-simple") -- for now fixed path
@@ -932,6 +939,9 @@ function minc2_xfm:append_grid_transform(grid_file,inv)
     return self
 end
 
+function minc2_xfm:concat_xfm(another)
+    assert(lib.minc2_xfm_concat_xfm(self._v,another._v)==ffi.C.MINC2_SUCCESS)
+end
 
 -- this is all we have in the module
 return { 

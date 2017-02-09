@@ -1548,4 +1548,22 @@ int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_pa
   }
 }
 
+int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o)
+{
+  int n;
+  VIO_General_transform *_xfm;
+  minc2_xfm_get_n_concat(h,&n);
+
+  if(n==0)
+  {
+    copy_general_transform(&o->xfm,&h->xfm);
+  } else {
+    VIO_General_transform concated;
+    concat_general_transforms( &h->xfm, &o->xfm, &concated );
+    delete_general_transform( &h->xfm );
+    h->xfm = concated;
+  }
+  return MINC2_SUCCESS;
+}
+
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */
