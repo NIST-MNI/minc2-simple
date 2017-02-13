@@ -23,7 +23,6 @@ ffi.set_source("minc2._simple",
 
 ffi.cdef(
     """
-
 /**
   * minc2 dimension types
   */ 
@@ -60,6 +59,20 @@ enum  minc2_type {
   MINC2_UNKNOWN  = -1     /**< when the type is a record */
 };
 
+
+/**
+  * XFM type
+  */
+enum  minc2_xfm {
+  MINC2_XFM_LINEAR=1,
+  MINC2_XFM_THIN_PLATE_SPLINE,
+  MINC2_XFM_USER_TRANSFORM,
+  MINC2_XFM_CONCATENATED_TRANSFORM,
+  MINC2_XFM_GRID_TRANSFORM,
+  MINC2_XFM_END
+};
+
+
 /**
  * minc2 dimension information
  */
@@ -85,11 +98,19 @@ typedef struct minc2_info_iterator* minc2_info_iterator_handle;
  * minc2 error codes, compatible with minc2 API
  */
 enum { MINC2_SUCCESS=0,MINC2_ERROR=-1};
+
 /** Opaque structure representing minc2 file
  * 
  */
 struct minc2_file;
 typedef struct minc2_file* minc2_file_handle; 
+
+/** Opaque structure representing minc2 XFM file
+ *
+ */
+struct minc2_xfm_file;
+typedef struct minc2_xfm_file *minc2_xfm_file_handle;
+
 
 /** 
  * allocate empty minc2 file structure, no need to call minc2_init after
@@ -107,11 +128,13 @@ minc2_file_handle minc2_allocate0(void);
  */
 int minc2_init(minc2_file_handle h);
 
-/** 
+
+/**
  * deallocate minc2 file structure
  * will call standard free on it
  */
 int minc2_free(minc2_file_handle h);
+
 
 /**
  * close minc2 file if it's open,
@@ -119,11 +142,11 @@ int minc2_free(minc2_file_handle h);
  */
 int minc2_destroy(minc2_file_handle h);
 
-
 /**
  * open existing file
  */
 int minc2_open(minc2_file_handle h,const char * path);
+
 
 /**
  * define a new minc2 volume, using provided storage dimension information and storage data type
@@ -330,10 +353,98 @@ const char* minc2_iterator_attribute_name(minc2_info_iterator_handle it);
  * generate timestamp
  */
 char* minc2_timestamp(int argc,char **argv);
+
+/**
+ * allocate empty minc2 xfm file structure
+ */
+int minc2_xfm_allocate(minc2_xfm_file_handle * h);
+
+/**
+ * alternative version
+ */
+minc2_xfm_file_handle minc2_xfm_allocate0(void);
+
+/**
+ * initialize minc2 xfm file structure
+ */
+int minc2_xfm_init(minc2_xfm_file_handle h);
+
+/**
+ * deallocate minc2 xfm file structure
+ * will call standard free on it
+ */
+int minc2_xfm_free(minc2_xfm_file_handle h);
+
+/**
+ * close minc2 xfm file if it's open,
+ * then deallocate minc2 file structure
+ */
+int minc2_xfm_destroy(minc2_xfm_file_handle h);
+
+/**
+ * open existing XFM file
+ */
+int minc2_xfm_open(minc2_xfm_file_handle h,const char * path);
+
+/**
+ * save XFM  to file
+ */
+int minc2_xfm_save(minc2_xfm_file_handle h,const char * path);
+
+/**
+ * transform x,y,z coordinates
+ */
+int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
+
+/**
+ * invert transform x,y,z coordinates
+ */
+int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
+
+/**
+ * set flag to invert transform
+ */
+int minc2_xfm_invert(minc2_xfm_file_handle h);
+
+/**
+ * get number of concatenated transforms, return at least 1
+ */
+int minc2_xfm_get_n_concat(minc2_xfm_file_handle h,int *n);
+
+/**
+ * get type of nth transform
+ */
+int minc2_xfm_get_n_type(minc2_xfm_file_handle h,int n,int *xfm_type);
+
+/**
+ * extract n'th transform, if it is linear, as a 4x4 matrix , in a row-major fashion
+ */
+int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix);
+
+/**
+ * extract n'th transform, if it is nonlinear, as a reference to a grid file
+ */
+int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file);
+
+
+/**
+ * Adds another  transform, a 4x4 matrix , in a row-major fashion
+ */
+int minc2_xfm_append_linear_transform(minc2_xfm_file_handle h,double *matrix);
+
+/**
+ * Adds another nonlinear grid transform
+ */
+int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_path,int inv);
+
+
+/**
+ * Concatenate another general xfm transform
+ */
+int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
     """
     )
 
 
 if __name__ == "__main__":
     ffi.compile(verbose=True)
-    
