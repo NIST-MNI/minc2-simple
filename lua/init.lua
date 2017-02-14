@@ -617,6 +617,77 @@ function minc2_file:load_complete_volume(data_type)
     return buf
 end
 
+
+function minc2_file:load_hyperslab(data_type, slab)
+    if not slab then
+        return self:load_complete_volume(data_type)
+    else
+        -- will be torch tensors
+        local data_type=data_type or ffi.C.MINC2_FLOAT
+        -- local buf_len=ffi.new("int[1]")
+        -- lib.minc2_nelement(self._v,buf_len)
+        -- buf_len=buf_len[0]
+        local buf=nil
+        local _dims=self:representation_dims()
+        local ndims=self:ndim()
+        local dims=torch.LongStorage(ndims)
+
+        local slab_start=ffi.new("int[?]",ndims)
+        local slab_count=ffi.new("int[?]",ndims)
+        -- local nelements=1
+
+        -- Torch tensor defines dimensions in a slowest first fashion, so as slab
+        for i=0,(ndims-1) do
+            if slab[i+1] ~= nil then
+                if type(slab[i+1])=='table' then
+                    if #slab[i+1]==2 then
+                        slab_count[ndims-1-i]=slab[i+1][2]-slab[i+1][1]+1
+                        slab_start[ndims-1-i]=slab[i+1][1]-1
+                    else -- assume it's the whole dimension
+                        slab_count[ndims-1-i]=_dims[ndims-i-1].length
+                        slab_start[ndims-1-i]=0
+                    end
+                else -- assume it's a number
+                    slab_count[ndims-1-i]=1
+                    slab_start[ndims-1-i]=slab[i+1]-1
+                end
+            else
+                slab_count[ndims-1-i]=_dims[ndims-i-1].length
+                slab_start[ndims-1-i]=0
+            end
+            dims[i+1]=slab_count[ndims-1-i]
+        end
+
+        if data_type==ffi.C.MINC2_BYTE then
+            buf=torch.CharTensor(dims)
+        elseif data_type==ffi.C.MINC2_UBYTE then
+            buf=torch.ByteTensor(dims)
+        elseif data_type==ffi.C.MINC2_SHORT then
+            buf=torch.ShortTensor(dims)
+        elseif data_type==ffi.C.MINC2_USHORT then
+            buf=torch.ShortTensor(dims)
+        elseif data_type==ffi.C.MINC2_INT then
+            buf=torch.IntTensor(dims)
+        elseif data_type==ffi.C.MINC2_UINT then
+            buf=torch.IntTensor(dims)
+        elseif data_type==ffi.C.MINC2_FLOAT then
+            buf=torch.FloatTensor(dims)
+        elseif data_type==ffi.C.MINC2_DOUBLE then
+            buf=torch.DoubleTensor(dims)
+        else
+            error("Unsupported  yet")
+        end
+        local i
+
+        assert(
+            lib.minc2_read_hyperslab(self._v, slab_start, slab_count, buf:storage():data(), data_type)==ffi.C.MINC2_SUCCESS
+        )
+
+        return buf
+    end
+end
+
+
 function minc2_file:setup_standard_order()
     assert( lib.minc2_setup_standard_order(self._v) == ffi.C.MINC2_SUCCESS)
 end
@@ -636,6 +707,7 @@ function minc2_file:save_complete_volume(buf)
     -- local s=buf:storage()
     local store_type=torch.type(buf)
     
+
     -- TODO: implement dimension checking!
     -- TODO: check if tensor is contigious
     -- TODO: figure out how to save non-contigious tensor
@@ -665,6 +737,91 @@ function minc2_file:save_complete_volume(buf)
         lib.minc2_save_complete_volume(self._v,buf:storage():data(),data_type)==ffi.C.MINC2_SUCCESS
         )
     return buf
+end
+
+
+function minc2_file:set_volume_range(rmin,rmax)
+    assert( rmin ~= nil)
+    assert( rmax ~= nil)
+    assert( lib.minc2_set_volume_range(self._v,rmin,rmax) == ffi.C.MINC2_SUCCESS)
+end
+
+function minc2_file:save_hyperslab(buf, start)
+    if not start then
+        return self:save_complete_volume(buf)
+    else
+        assert(buf~=nil)
+
+        -- will be torch tensors
+        local data_type=ffi.C.MINC2_FLOAT
+
+        local ndims =self:ndim()
+        local dims = buf:size()
+
+        local slab_start=ffi.new("int[?]",ndims)
+        local slab_count=ffi.new("int[?]",ndims)
+        -- local nelements=1
+
+        -- Torch tensor defines dimensions in a slowest first fashion, so as slab
+        for i=0,(ndims-1) do
+            if start[i+1] ~= nil then
+                if type(start[i+1])=='table' then
+                    if #start[i+1]==2 then
+                        slab_count[ndims-1-i]=start[i+1][2]-start[i+1][1]+1
+                        slab_start[ndims-1-i]=start[i+1][1]-1
+                    else -- assume it's the whole dimension
+                        slab_count[ndims-1-i]=dims[i+1]
+                        slab_start[ndims-1-i]=0
+                    end
+                else -- assume it's a number
+                    slab_count[ndims-1-i]=dims[i+1]
+                    slab_start[ndims-1-i]=start[i+1]-1
+                end
+            else
+                slab_count[ndims-1-i]=dims[i+1]
+                slab_start[ndims-1-i]=0
+            end
+        end
+
+
+        print(string.format("slab_start=[%d,%d,%d]",slab_start[0],slab_start[1],slab_start[2]))
+        print(string.format("slab_count=[%d,%d,%d]",slab_count[0],slab_count[1],slab_count[2]))
+
+        local data_type=ffi.C.MINC2_FLOAT
+        local store_type=torch.type(buf)
+
+        -- TODO: implement dimension checking!
+        -- TODO: check if tensor is contigious
+        -- TODO: figure out how to save non-contigious tensor
+
+        if store_type == 'torch.CharTensor' then
+            data_type=ffi.C.MINC2_BYTE
+        elseif store_type=='torch.ByteTensor' then
+            data_type=ffi.C.MINC2_UBYTE
+        elseif store_type=='torch.ShortTensor' then
+            data_type=ffi.C.MINC2_SHORT
+        elseif store_type=='torch.ShortTensor' then
+            data_type=ffi.C.MINC2_USHORT
+        elseif store_type=='torch.IntTensor' then
+            data_type=ffi.C.MINC2_INT
+        elseif store_type == 'torch.IntTensor' then
+            data_type=ffi.C.MINC2_UINT
+        elseif store_type == 'torch.FloatTensor' then
+            data_type=ffi.C.MINC2_FLOAT
+        elseif store_type == 'torch.DoubleTensor' then
+            data_type=ffi.C.MINC2_DOUBLE
+        else
+            print(string.format("store_type=%s",store_type))
+            error("Unsupported  yet")
+        end
+        local i
+
+        assert(
+            lib.minc2_write_hyperslab(self._v, slab_start, slab_count, buf:storage():data(), data_type)==ffi.C.MINC2_SUCCESS
+        )
+
+        return buf
+    end
 end
 
 function minc2_file:read_attribute(group,attribute)

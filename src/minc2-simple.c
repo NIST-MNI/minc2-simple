@@ -678,7 +678,7 @@ int minc2_write_hyperslab(minc2_file_handle h,int *start,int *count,const void* 
   return err;
 }
 
-int minc2_read_hyperslab(minc2_file_handle h,int *start,int *count,void* buffer,int representation_type)
+int minc2_read_hyperslab(minc2_file_handle h, int *start, int *count, void* buffer, int representation_type)
 {
   mitype_t buffer_type=_minc2_type_to_mitype(representation_type);
   int i;
