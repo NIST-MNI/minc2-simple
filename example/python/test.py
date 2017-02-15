@@ -1,5 +1,7 @@
 from minc2.simple import minc2_file
+from minc2.simple import minc2_xfm
 import sys
+import numpy as np
 
 
 if __name__ == "__main__":
@@ -54,4 +56,11 @@ if __name__ == "__main__":
     o.close()
     # not strictly needed  either, the file will be close by garbage collection
     m.close()
+    
+    # experiment with XFM files
+    x=minc2_xfm()
+    identity=np.eye(4)
+    x.append_linear_transform(identity)
+    x.save('identity.xfm')
+    
     

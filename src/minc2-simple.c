@@ -1332,6 +1332,12 @@ minc2_xfm_file_handle minc2_xfm_allocate0(void)
   return h;
 }
 
+int minc2_xfm_init(minc2_xfm_file_handle h)
+{
+  memset(h,0,sizeof(struct minc2_xfm_file));
+  return MINC2_SUCCESS;
+}
+
 
 int minc2_xfm_free(minc2_xfm_file_handle h)
 {

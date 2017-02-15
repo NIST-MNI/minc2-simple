@@ -165,7 +165,6 @@ class minc2_file(object):
                 raise minc2_error()
             return ffi.string(buf, attr_length[0])
         else:
-
             data_type=attr_type[0]
             buf=None
             if data_type in minc2_file.__minc2_to_numpy:
@@ -230,5 +229,86 @@ class minc2_file(object):
         for group,g in six.iteritems(m):
             for attr,a in six.iteritems(g):
                 self.write_attribute(group,attr,a)
+
+
+
+class minc2_xfm(object):
+    # constants
+    MINC2_XFM_LINEAR                 = lib.MINC2_XFM_LINEAR
+    MINC2_XFM_THIN_PLATE_SPLINE      = lib.MINC2_XFM_THIN_PLATE_SPLINE
+    MINC2_XFM_USER_TRANSFORM         = lib.MINC2_XFM_USER_TRANSFORM
+    MINC2_XFM_CONCATENATED_TRANSFORM = lib.MINC2_XFM_CONCATENATED_TRANSFORM
+    MINC2_XFM_GRID_TRANSFORM         = lib.MINC2_XFM_GRID_TRANSFORM
+
+
+    def __init__(self,path=None):
+        self._v=ffi.gc(lib.minc2_xfm_allocate0(),lib.minc2_xfm_destroy)
+        if path is not None:
+            self.open(path)
+
+
+    def open(self,path):
+        assert path is not None,"Provide minc2 file"
+        assert lib.minc2_xfm_open(self._v,path) == lib.MINC2_SUCCESS
+
+
+    def save(self,path):
+        assert path is not None,"Provide minc2 file"
+        assert(lib.minc2_xfm_save(self._v,path) == lib.MINC2_SUCCESS)
+
+
+    def transform_point(self,xyz_in):
+        import numpy as np
+        xyz_out=np.empty([3],'float64','C')
+        assert(lib.minc2_xfm_transform_point(self._v,ffi.cast("double *", xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+        return xyz_out
+
+
+    def inverse_transform_point(self,xyz_in):
+        import numpy as np
+        xyz_out=np.empty([3],'float64','C')
+        assert(lib.minc2_xfm_inverse_transform_point(self._v,ffi.cast("double *", xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+        return xyz_out
+
+
+    def invert(self):
+        assert(lib.minc2_xfm_invert(self._v)==lib.MINC2_SUCCESS)
+
+    def get_n_concat(self):
+        n=ffi.new("int*",0)
+        assert(lib.minc2_xfm_get_n_concat(self._v,n)==lib.MINC2_SUCCESS)
+        return n[0]
+
+    def get_n_type(self,n=0):
+        t=ffi.new("int*",0)
+        assert(lib.minc2_xfm_get_n_type(self._v,n,t)==lib.MINC2_SUCCESS)
+        return t[0]
+
+    def get_grid_transform(self,n=0):
+        c_file=ffi.new("char**")
+        inv=ffi.new("int*",0)
+        assert(lib.minc2_xfm_get_grid_transform(self._v,n,inv,c_file)==lib.MINC2_SUCCESS)
+        _file=ffi.string(c_file[0])
+        ffi.free(c_file[0])
+        return (_file,inv[0])
+
+    def get_linear_transform(self,n=0):
+        import numpy as np
+        _mat=np.empty([4,4],'float64','C')
+        assert(lib.minc2_xfm_get_linear_transform(self._v,n,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
+        return _mat
+
+    def append_linear_transform(self,mat):
+        import numpy as np
+        _mat=np.asarray(mat,'float64','C')
+        assert(lib.minc2_xfm_append_linear_transform(self._v,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
+        return self
+
+    def append_grid_transform(self,grid_file,inv=False):
+        assert(lib.minc2_xfm_append_grid_transform(self._v,grid_file,inv)==lib.MINC2_SUCCESS)
+        return self
+
+    def concat_xfm(self,another):
+        assert(lib.minc2_xfm_concat_xfm(self._v,another._v)==lib.MINC2_SUCCESS)
 
 # kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl python; show-tabs on
