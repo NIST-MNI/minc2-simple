@@ -285,6 +285,7 @@ class minc2_xfm(object):
         return t[0]
 
     def get_grid_transform(self,n=0):
+        warnings.warn("Grid transform is not tested")
         c_file=ffi.new("char**")
         inv=ffi.new("int*",0)
         assert(lib.minc2_xfm_get_grid_transform(self._v,n,inv,c_file)==lib.MINC2_SUCCESS)
@@ -305,6 +306,7 @@ class minc2_xfm(object):
         return self
 
     def append_grid_transform(self,grid_file,inv=False):
+        warnings.warn("Grid transform is not tested")
         assert(lib.minc2_xfm_append_grid_transform(self._v,grid_file,inv)==lib.MINC2_SUCCESS)
         return self
 
