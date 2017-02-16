@@ -259,15 +259,17 @@ class minc2_xfm(object):
 
     def transform_point(self,xyz_in):
         import numpy as np
+        _xyz_in=np.asarray(xyz_in,'float64','C')
         xyz_out=np.empty([3],'float64','C')
-        assert(lib.minc2_xfm_transform_point(self._v,ffi.cast("double *", xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+        assert(lib.minc2_xfm_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
         return xyz_out
 
 
     def inverse_transform_point(self,xyz_in):
         import numpy as np
+        _xyz_in=np.asarray(xyz_in,'float64','C')
         xyz_out=np.empty([3],'float64','C')
-        assert(lib.minc2_xfm_inverse_transform_point(self._v,ffi.cast("double *", xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+        assert(lib.minc2_xfm_inverse_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
         return xyz_out
 
 
