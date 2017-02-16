@@ -19,6 +19,7 @@ ffi.set_source("minc2._simple",
     libraries=["minc2","c"],
     include_dirs=[os.path.join(minc_prefix,"include"),source_path],
     library_dirs=[os.path.join(minc_prefix,"lib")],
+    extra_link_args=['-Wl,-rpath={}'.format(os.path.join(minc_prefix,"lib"))]
 )
 
 ffi.cdef(
