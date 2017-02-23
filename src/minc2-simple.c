@@ -11,10 +11,10 @@
 /**
  * internal functions
  */
-static int _minc2_allocate_dimensions(minc2_file_handle h,int nDims);
-static int _minc2_cleanup_dimensions(minc2_file_handle h);
+static int      _minc2_allocate_dimensions(minc2_file_handle h,int nDims);
+static int      _minc2_cleanup_dimensions(minc2_file_handle h);
 static mitype_t _minc2_type_to_mitype(int minc2_type);
-static int _mitype_to_minc2_type(mitype_t t);
+static int      _mitype_to_minc2_type(mitype_t t);
 
 /**
  * internal representation of the minc file
@@ -67,6 +67,23 @@ struct minc2_info_iterator
   char attr_name[ITERATOR_INFO_SIZE];
 };
 
+
+struct minc2_file_iterator
+{
+  minc2_info_iterator_handle _minc_file;
+
+  int *_index;
+
+  int *_end;
+  int *_start;
+  int *_count;
+  int _cur_dim;
+
+  int _output_mode;
+  int _data_type;
+};
+
+
 /**
  * public functions
  */
@@ -83,8 +100,6 @@ minc2_file_handle minc2_allocate0(void)
     return NULL;
   return h;
 }
-
-
 
 
 int minc2_destroy(minc2_file_handle h)
@@ -1571,5 +1586,83 @@ int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o)
   }
   return MINC2_SUCCESS;
 }
+
+
+minc2_file_iterator_handle minc2_iterator_allocate0(void)
+{
+  minc2_file_iterator_handle h=calloc(1,sizeof(struct minc2_file_iterator));
+}
+
+int minc2_iterator_free(minc2_file_iterator_handle h)
+{
+  if(!h) return MINC2_SUCCESS;
+
+  if(h->_index) free(h->_index);
+  if(h->_start) free(h->_start);
+  if(h->_end) free(h->_end);
+  free(h);
+
+  return MINC2_SUCCESS;
+}
+
+static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type)
+{
+  int i;
+  h->_minc_file=m;
+  h->_data_type=data_type;
+
+  h->_index=(int*)realloc(h->_index,sizeof(int)*h->_minc_file->ndim);
+  h->_start=(int*)realloc(h->_start,sizeof(int)*h->_minc_file->ndim);
+  h->_end=(int*)realloc(h->_end,sizeof(int)*h->_minc_file->ndim);
+  h->_count=(int*)realloc(h->_count,sizeof(int)*h->_minc_file->ndim);
+
+  /*for now use the whole volume */
+  for ( i = 0; i < h->_minc_file->ndims ; i++ )
+  {
+    h->_start[i]=0;
+    h->_count[i]=1;
+
+    if(h->_minc_file->using_apparent_order)
+      h->_end[i]=h->_minc_file->representation_dims[h->_minc_file->ndims-i-1].length;
+    else
+      h->_end[i]=h->_minc_file->store_dims[h->_minc_file->ndims-i-1].length;
+  }
+
+  h->_cur_dim=0;/*start with fastest varying...*/
+
+  return MINC2_SUCCESS;
+}
+
+int minc2_iterator_input_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type)
+{
+  if(minc2_iterator_start(h,m,data_type)!=MINC2_SUCCESS)
+    return MINC2_ERROR;
+
+  h->_output_mode=0;
+  return MINC2_SUCCESS;
+}
+
+int minc2_iterator_output_start(minc2_file_handle h,int data_type)
+{
+  if(minc2_iterator_start(h,m,data_type)!=MINC2_SUCCESS)
+    return MINC2_ERROR;
+
+  h->_output_mode=1;
+  return MINC2_SUCCESS;
+}
+
+int minc2_iterator_next(minc2_file_handle h,int data_type)
+{
+  /*if(h->_output_mode) */
+  /*TODO: when buffering will be used , flush data to disk or read next slice*/
+}
+
+
+int minc2_iterator_flush(minc2_file_handle h);
+
+int minc2_iterator_get_value(minc2_file_handle h,void *val);
+int minc2_iterator_put_value(minc2_file_handle h,void *val);
+
+
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */
