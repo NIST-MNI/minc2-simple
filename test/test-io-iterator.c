@@ -49,12 +49,13 @@ int main(int argc,char **argv)
     /*iterate over input volume to determine data range*/
     input_it=minc2_iterator_allocate0();
     start=clock();
-    cnt=0;g_avg=0.0;
-    
+    cnt=0;
+    g_avg=0.0;
     g_min=1e10;
     g_max=-1e10;
     
     minc2_iterator_input_start(input_it,h,MINC2_DOUBLE);
+    
     do {
       double v;
       minc2_iterator_get_value(input_it,&v);
@@ -62,9 +63,12 @@ int main(int argc,char **argv)
       if(v>g_max) g_max=v;
       g_avg+=v;
       cnt++;
+      if(! (cnt%1000)) { fprintf(stderr,"%d\n",cnt); }
     } while(minc2_iterator_next(input_it)==MINC2_SUCCESS);
+    
     diff=clock()-start;
     g_avg/=cnt;
+    
     fprintf(stdout,"Reading: Avg:%lf min:%lf max:%lf time:%lf msec\n",g_avg,g_min,g_max, (diff * 1000.0 / CLOCKS_PER_SEC));
     
         
@@ -78,7 +82,7 @@ int main(int argc,char **argv)
     {
       int cnt_o=0;
       /*going to setup global scaling*/
-      minc2_set_volume_range(o,s_min,s_max);
+      minc2_set_volume_range(o,g_min,g_max);
       
       minc2_slice_ndim(o,&o_slice_dim);
       fprintf(stdout,"Output slice dimensions:%d\n",o_slice_dim);
@@ -97,7 +101,7 @@ int main(int argc,char **argv)
       
       g_avg/=cnt;
       diff=clock();
-      fprintf(stdout,"Writing: time:%ld msec input_cnt=%d output_cnt=%d\n",(diff * 1000 / CLOCKS_PER_SEC),cnt,o_cnt);
+      fprintf(stdout,"Writing: time:%ld msec input_cnt=%d output_cnt=%d\n",(diff * 1000 / CLOCKS_PER_SEC),cnt,cnt_o);
       minc2_iterator_free(output_it);
       /*copy metadata*/
       minc2_copy_metadata(h,o);
@@ -107,11 +111,12 @@ int main(int argc,char **argv)
     }
     minc2_close(h);
     minc2_close(o);
+    minc2_iterator_free(input_it);
   } else {
     fprintf(stderr,"Can't open file %s for reading",argv[1]);
     err++;
   }
-  minc2_iterator_free(input_it);
+  
   minc2_free(h);
   minc2_free(o);
   return err;

@@ -70,10 +70,10 @@ struct minc2_info_iterator
 
 struct minc2_file_iterator
 {
-  minc2_info_iterator_handle _minc_file;
+  minc2_file_handle _minc_file;
+  int _ndim;
 
   int *_index;
-
   int *_end;
   int *_start;
   int *_count;
@@ -1609,13 +1609,12 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle m
   int i;
   h->_minc_file=m;
   h->_data_type=data_type;
-  h->_ndim=h->_minc_file->ndim;
+  h->_ndim=h->_minc_file->ndims;
 
   h->_index=(int*)realloc(h->_index,sizeof(int)*h->_ndim);
   h->_start=(int*)realloc(h->_start,sizeof(int)*h->_ndim);
-  h->_end=(int*)realloc(h->_end,sizeof(int)*h->_ndim);
-  h->_count=(int*)realloc(h->_count,sizeof(int)*);
-
+  h->_end=  (int*)realloc(h->_end,  sizeof(int)*h->_ndim);
+  h->_count=(int*)realloc(h->_count,sizeof(int)*h->_ndim);
 
   /*for now use the whole volume */
   for ( i = 0; i < h->_ndim ; i++ )
@@ -1651,7 +1650,7 @@ int minc2_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle m
   return MINC2_SUCCESS;
 }
 
-int minc2_iterator_next(minc2_file_iterator_handle h,int data_type)
+int minc2_iterator_next(minc2_file_iterator_handle h)
 {
   int i=0;
   /*if(h->_output_mode) */
@@ -1671,7 +1670,7 @@ int minc2_iterator_next(minc2_file_iterator_handle h,int data_type)
         return MINC2_ERROR;
       }
     }
-  } while( 1 )
+  } while( 1 );
   return MINC2_ERROR;
 }
 
@@ -1686,7 +1685,7 @@ int minc2_iterator_get_value(minc2_file_iterator_handle h,void *val)
   return minc2_read_hyperslab(h->_minc_file,h->_index,h->_count,val,h->_data_type);
 }
 
-int minc2_iterator_put_value(minc2_file_handle h,void *val)
+int minc2_iterator_put_value(minc2_file_iterator_handle h,void *val)
 {
   return minc2_write_hyperslab(h->_minc_file, h->_index, h->_count,val, h->_data_type);
 }
