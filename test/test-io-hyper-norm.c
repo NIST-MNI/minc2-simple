@@ -19,17 +19,6 @@ void print_dimension_info(struct minc2_dimension *dims)
   }
 }
 
-int hyperslab_inside(int *_start,const struct minc2_dimension *dims)
-{
-  while(dims->id!=MINC2_DIM_END)
-  {
-    if(*_start>=dims->length) return 0;
-    dims++;
-    _start++;
-  }
-  return 1;
-}
-
 int hyperslab_iterate(int *_start,const struct minc2_dimension *dims,int skip)
 {
   int d=0;

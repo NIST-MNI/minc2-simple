@@ -80,6 +80,12 @@ struct minc2_file_iterator
 
   int _output_mode;
   int _data_type;
+
+  int _slice_dimensions;
+
+  void *_buffer;
+
+  int _buffer_size;
 };
 
 
@@ -1136,6 +1142,33 @@ static int _mitype_to_minc2_type(mitype_t t)
   return (int)t;
 }
 
+static int _minc2_type_size(int minc2_type_id)
+{
+  switch(minc2_type_id )
+    {
+    case MINC2_UBYTE:
+      return sizeof(unsigned char);
+    case MINC2_BYTE:
+      return sizeof(char);
+    case MINC2_USHORT:
+      return sizeof(unsigned short);
+    case MINC2_SHORT:
+      return sizeof(short);
+    case MINC2_UINT:
+      return sizeof(unsigned int);
+    case MINC2_INT:
+      return sizeof(int);
+    case MINC2_FLOAT:
+      return sizeof(float);
+    case MINC2_DOUBLE:
+      return sizeof(double);
+    case MINC2_STRING:
+      return sizeof(char);
+    default:
+      return 1; /*ERROR?*/
+  }
+}
+
 
 minc2_info_iterator_handle minc2_allocate_info_iterator(void)
 {
@@ -1598,7 +1631,9 @@ int minc2_iterator_free(minc2_file_iterator_handle h)
 
   if(h->_index) free(h->_index);
   if(h->_start) free(h->_start);
-  if(h->_end) free(h->_end);
+  if(h->_end)   free(h->_end);
+  if(h->_buffer)free(h->_buffer);
+
   free(h);
 
   return MINC2_SUCCESS;
@@ -1629,6 +1664,17 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle m
       h->_end[i]=h->_minc_file->store_dims[h->_ndim-i-1].length;
   }
 
+  minc2_slice_ndim(h->_minc_file,&h->_slice_dimensions);
+  if(h->_slice_dimensions<1)
+    h->_slice_dimensions=1;
+
+  h->_buffer_size=1;
+  for(i=0;i<h->_slice_dimensions;i++)
+  {
+    h->_buffer_size*=(h->_end[i]-h->_start[i]);
+  }
+
+  h->_buffer=(void*)realloc(h->_buffer,_minc2_type_size(data_type)*h->_buffer_size);
   return MINC2_SUCCESS;
 }
 
@@ -1676,9 +1722,22 @@ int minc2_iterator_next(minc2_file_iterator_handle h)
 
 int minc2_iterator_flush(minc2_file_iterator_handle h)
 {
-  /*TODO: NOOP untill we make bufferring*/
+  if(h->_output_mode)
+  {
+    /*TODO: write to minc file*/
+  }
   return MINC2_SUCCESS;
 }
+
+int minc2_iterator_pump(minc2_file_iterator_handle h)
+{
+  if(!h->_output_mode)
+  {
+    /*TODO: read next slice*/
+  }
+  return MINC2_SUCCESS;
+}
+
 
 int minc2_iterator_get_value(minc2_file_iterator_handle h,void *val)
 {
