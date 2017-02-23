@@ -77,7 +77,6 @@ struct minc2_file_iterator
   int *_end;
   int *_start;
   int *_count;
-  int _cur_dim;
 
   int _output_mode;
   int _data_type;
@@ -1610,25 +1609,26 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle m
   int i;
   h->_minc_file=m;
   h->_data_type=data_type;
+  h->_ndim=h->_minc_file->ndim;
 
-  h->_index=(int*)realloc(h->_index,sizeof(int)*h->_minc_file->ndim);
-  h->_start=(int*)realloc(h->_start,sizeof(int)*h->_minc_file->ndim);
-  h->_end=(int*)realloc(h->_end,sizeof(int)*h->_minc_file->ndim);
-  h->_count=(int*)realloc(h->_count,sizeof(int)*h->_minc_file->ndim);
+  h->_index=(int*)realloc(h->_index,sizeof(int)*h->_ndim);
+  h->_start=(int*)realloc(h->_start,sizeof(int)*h->_ndim);
+  h->_end=(int*)realloc(h->_end,sizeof(int)*h->_ndim);
+  h->_count=(int*)realloc(h->_count,sizeof(int)*);
+
 
   /*for now use the whole volume */
-  for ( i = 0; i < h->_minc_file->ndims ; i++ )
+  for ( i = 0; i < h->_ndim ; i++ )
   {
     h->_start[i]=0;
     h->_count[i]=1;
+    h->_index[i]=0;
 
     if(h->_minc_file->using_apparent_order)
-      h->_end[i]=h->_minc_file->representation_dims[h->_minc_file->ndims-i-1].length;
+      h->_end[i]=h->_minc_file->representation_dims[h->_ndim-i-1].length;
     else
-      h->_end[i]=h->_minc_file->store_dims[h->_minc_file->ndims-i-1].length;
+      h->_end[i]=h->_minc_file->store_dims[h->_ndim-i-1].length;
   }
-
-  h->_cur_dim=0;/*start with fastest varying...*/
 
   return MINC2_SUCCESS;
 }
@@ -1642,7 +1642,7 @@ int minc2_iterator_input_start(minc2_file_iterator_handle h,minc2_file_handle m,
   return MINC2_SUCCESS;
 }
 
-int minc2_iterator_output_start(minc2_file_handle h,int data_type)
+int minc2_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type)
 {
   if(minc2_iterator_start(h,m,data_type)!=MINC2_SUCCESS)
     return MINC2_ERROR;
@@ -1651,17 +1651,45 @@ int minc2_iterator_output_start(minc2_file_handle h,int data_type)
   return MINC2_SUCCESS;
 }
 
-int minc2_iterator_next(minc2_file_handle h,int data_type)
+int minc2_iterator_next(minc2_file_iterator_handle h,int data_type)
 {
+  int i=0;
   /*if(h->_output_mode) */
   /*TODO: when buffering will be used , flush data to disk or read next slice*/
+  do {
+    h->_index[i]++;
+
+    if(h->_index[i] < h->_end[i])
+    {
+      return MINC2_SUCCESS;
+    } else {
+      if( i < (h->_ndim-1) )
+      {
+        h->_index[i]=h->_start[i];
+        i++;
+      } else {
+        return MINC2_ERROR;
+      }
+    }
+  } while( 1 )
+  return MINC2_ERROR;
 }
 
+int minc2_iterator_flush(minc2_file_iterator_handle h)
+{
+  /*TODO: NOOP untill we make bufferring*/
+  return MINC2_SUCCESS;
+}
 
-int minc2_iterator_flush(minc2_file_handle h);
+int minc2_iterator_get_value(minc2_file_iterator_handle h,void *val)
+{
+  return minc2_read_hyperslab(h->_minc_file,h->_index,h->_count,val,h->_data_type);
+}
 
-int minc2_iterator_get_value(minc2_file_handle h,void *val);
-int minc2_iterator_put_value(minc2_file_handle h,void *val);
+int minc2_iterator_put_value(minc2_file_handle h,void *val)
+{
+  return minc2_write_hyperslab(h->_minc_file, h->_index, h->_count,val, h->_data_type);
+}
 
 
 

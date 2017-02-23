@@ -442,9 +442,8 @@ int minc2_iterator_free(minc2_file_iterator_handle h);
 int minc2_iterator_input_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type);
 int minc2_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type);
 
-int minc2_iterator_next(minc2_file_handle h,int data_type);
-int minc2_iterator_position(minc2_file_handle h,int *index);
-int minc2_iterator_flush(minc2_file_handle h);
+int minc2_iterator_next(minc2_file_iterator_handle h,int data_type);
+int minc2_iterator_flush(minc2_file_iterator_handle h);
 
 int minc2_iterator_get_value(minc2_file_handle h,void *val);
 int minc2_iterator_put_value(minc2_file_handle h,void *val);

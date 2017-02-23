@@ -10,11 +10,14 @@ TARGET_LINK_LIBRARIES(test-io-hyper minc2-simple ${LIBMINC_LIBRARIES})
 ADD_EXECUTABLE(test-io-hyper-norm   test-io-hyper-norm.c)
 TARGET_LINK_LIBRARIES(test-io-hyper-norm minc2-simple ${LIBMINC_LIBRARIES})
 
+ADD_EXECUTABLE(test-io-iterator   test-io-iterator.c)
+TARGET_LINK_LIBRARIES(test-io-iterator minc2-simple ${LIBMINC_LIBRARIES})
 
 #TODO: add proper arguments to testing functions here
 ADD_TEST(test-io-full       test-io-full ) 
 ADD_TEST(test-io-hyper      test-io-hyper )
 ADD_TEST(test-io-hyper-norm test-io-hyper-norm )
+ADD_TEST(test-io-iterator   test-io-iterator)
 
 
 #kate: indent-width 2; replace-tabs on; 
