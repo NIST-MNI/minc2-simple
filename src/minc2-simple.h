@@ -439,8 +439,13 @@ int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
 minc2_file_iterator_handle minc2_iterator_allocate0(void);
 int minc2_iterator_free(minc2_file_iterator_handle h);
 
-int minc2_iterator_input_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type);
+int minc2_iterator_input_start (minc2_file_iterator_handle h,minc2_file_handle m,int data_type);
 int minc2_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type);
+
+
+int minc2_multi_iterator_input_start (minc2_file_iterator_handle h,minc2_file_handle *m,int data_type,int fnum);
+int minc2_multi_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle *m,int data_type,int fnum);
+
 
 int minc2_iterator_next(minc2_file_iterator_handle h);
 /*int minc2_iterator_flush(minc2_file_iterator_handle h);*/
@@ -448,14 +453,9 @@ int minc2_iterator_next(minc2_file_iterator_handle h);
 int minc2_iterator_get_value(minc2_file_iterator_handle h,void *val);
 int minc2_iterator_put_value(minc2_file_iterator_handle h,void *val);
 
-
-
 #ifdef __cplusplus
 }
 #endif /* __cplusplus defined */
 
-
 #endif /*MINC2_SIMPLE_H*/
-
-
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c*/
