@@ -74,14 +74,12 @@ int main(int argc,char **argv)
     /*setup writing*/
     minc2_define(o,store_dims,MINC2_USHORT,MINC2_DOUBLE); /*writing to ushort volume, using double*/
     
-    minc2_set_scaling(o,1,0);
-    
-
+    minc2_set_scaling(o,0,1);
     if(minc2_create(o,argv[2])==MINC2_SUCCESS)
     {
       int cnt_o=0;
       /*going to setup global scaling*/
-      minc2_set_volume_range(o,g_min,g_max);
+      /*minc2_set_volume_range(o,g_min,g_max);*/
       
       minc2_slice_ndim(o,&o_slice_dim);
       fprintf(stdout,"Output slice dimensions:%d\n",o_slice_dim);

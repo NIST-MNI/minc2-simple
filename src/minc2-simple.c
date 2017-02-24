@@ -651,7 +651,7 @@ int minc2_set_slice_range(minc2_file_handle h,int *start,double value_min,double
   {
     h->tmp_start[i]=start[h->ndims-i-1];
   }
-  if( miset_slice_range(h->vol,h->tmp_start, (size_t)h->ndims, value_min, value_max) < 0)
+  if( miset_slice_range(h->vol,h->tmp_start, (size_t)h->ndims, value_max, value_min) < 0)
     return MINC2_ERROR;
 
   return MINC2_SUCCESS;
@@ -1694,10 +1694,46 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle m
 static int minc2_iterator_flush(minc2_file_iterator_handle h)
 {
   int i;
-    
   if(h->_output_mode)
   {
-    /*ADD slice normalization logic here*/
+    if( h->_minc_file->slice_scaling_flag )
+    {
+      double buffer_min,buffer_max;
+      switch(h->_data_type )
+      {
+        case MINC2_UBYTE:
+          _GET_BUFFER_MIN_MAX(unsigned char,h->_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_BYTE:
+          _GET_BUFFER_MIN_MAX(char,h->_buffer, h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_USHORT:
+          _GET_BUFFER_MIN_MAX(unsigned short,h->_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_SHORT:
+          _GET_BUFFER_MIN_MAX(short,h->_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_UINT:
+          _GET_BUFFER_MIN_MAX(unsigned int,h->_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_INT:
+          _GET_BUFFER_MIN_MAX(int,h->_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_FLOAT:
+          _GET_BUFFER_MIN_MAX(float,h->_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_DOUBLE:
+          _GET_BUFFER_MIN_MAX(double,h->_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        default:
+          MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
+          return MINC2_ERROR;
+      }
+
+      if ( minc2_set_slice_range(h->_minc_file,h->_index,buffer_min,buffer_max)!=MINC2_SUCCESS )
+        return MINC2_ERROR;
+    }
+
     return minc2_write_hyperslab(h->_minc_file, h->_index,h->_count, h->_buffer, h->_data_type);
   } else {
     return minc2_read_hyperslab( h->_minc_file, h->_index,h->_count, h->_buffer, h->_data_type);
@@ -1724,8 +1760,6 @@ int minc2_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle m
     return MINC2_ERROR;
 
   h->_output_mode=1;
-  
-  
   return MINC2_SUCCESS;
 }
 
@@ -1733,9 +1767,7 @@ int minc2_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle m
 int minc2_iterator_next(minc2_file_iterator_handle h)
 {
   int i=0;
-    
   h->_buffer_index++;
-  
   do {
     if( i == h->_slice_dimensions && h->_output_mode ) /*write last slice*/
     {
@@ -1771,7 +1803,6 @@ int minc2_iterator_next(minc2_file_iterator_handle h)
   return MINC2_ERROR; /*should never get here*/
 }
 
-
 int minc2_iterator_get_value(minc2_file_iterator_handle h,void *val)
 {
   memcpy(val,h->_buffer+h->_buffer_index*h->_element_size,h->_element_size);
@@ -1783,7 +1814,6 @@ int minc2_iterator_put_value(minc2_file_iterator_handle h,void *val)
   memcpy(h->_buffer+h->_buffer_index*h->_element_size,val,h->_element_size);
   return MINC2_SUCCESS;
 }
-
 
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */
