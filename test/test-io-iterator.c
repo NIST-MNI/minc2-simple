@@ -63,7 +63,6 @@ int main(int argc,char **argv)
       if(v>g_max) g_max=v;
       g_avg+=v;
       cnt++;
-      if(! (cnt%1000)) { fprintf(stderr,"%d\n",cnt); }
     } while(minc2_iterator_next(input_it)==MINC2_SUCCESS);
     
     diff=clock()-start;
@@ -90,14 +89,14 @@ int main(int argc,char **argv)
       start=clock();
       minc2_iterator_input_start(input_it,h,MINC2_DOUBLE);
       minc2_iterator_output_start(output_it,o,MINC2_DOUBLE);
-
       do 
       {
         double v;
         minc2_iterator_get_value(input_it,&v);
         minc2_iterator_put_value(output_it,&v);
         cnt_o++;
-      } while(minc2_iterator_next(input_it)==MINC2_SUCCESS && minc2_iterator_next(output_it)==MINC2_SUCCESS );
+        minc2_iterator_next(output_it); /*have to advance to make sure we flush data to disk*/
+      } while(minc2_iterator_next(input_it)==MINC2_SUCCESS );
       
       g_avg/=cnt;
       diff=clock();
