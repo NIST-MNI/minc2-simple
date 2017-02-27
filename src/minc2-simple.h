@@ -450,8 +450,8 @@ int minc2_multi_iterator_output_start(minc2_file_iterator_handle h,minc2_file_ha
 int minc2_iterator_next(minc2_file_iterator_handle h);
 /*int minc2_iterator_flush(minc2_file_iterator_handle h);*/
 
-int minc2_iterator_get_value(minc2_file_iterator_handle h,void *val);
-int minc2_iterator_put_value(minc2_file_iterator_handle h,void *val);
+int minc2_iterator_get_values(minc2_file_iterator_handle h,void *val);
+int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val);
 
 #ifdef __cplusplus
 }

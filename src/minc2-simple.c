@@ -1835,29 +1835,32 @@ int minc2_iterator_next(minc2_file_iterator_handle h)
   return MINC2_ERROR; /*should never get here*/
 }
 
-int minc2_iterator_get_value(minc2_file_iterator_handle h,void *val)
+int minc2_iterator_get_values(minc2_file_iterator_handle h,void *val)
 {
   int f;
+  const void *_buffer=h->_buffer+h->_buffer_index*h->_element_size;
+  void *_val=val;
+
   for(f=0;f<h->_fnum;f++)
   {
-    void *_buffer=h->_buffer+f*h->_buffer_size*h->_element_size;
-    void *_val=   val       +f*h->_element_size;
-
-    memcpy(_val,_buffer+h->_buffer_index*h->_element_size,h->_element_size);
+    memcpy(_val,_buffer,h->_element_size);
+    _buffer+=h->_buffer_size*h->_element_size;
+    _val+=h->_element_size;
   }
   return MINC2_SUCCESS;
 }
 
-int minc2_iterator_put_value(minc2_file_iterator_handle h,void *val)
+int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val)
 {
   int f;
+  void *_buffer=h->_buffer+h->_buffer_index*h->_element_size;
+  const void *_val=val;
 
   for(f=0;f<h->_fnum;f++)
   {
-    void *_buffer=h->_buffer + f*h->_buffer_size*h->_element_size;
-    void *_val=   val        + f*h->_element_size;
-
-    memcpy(_buffer+h->_buffer_index*h->_element_size,_val,h->_element_size);
+    memcpy(_buffer,_val,h->_element_size);
+    _buffer+=h->_buffer_size*h->_element_size;
+    _val+=h->_element_size;
   }
   return MINC2_SUCCESS;
 }

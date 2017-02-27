@@ -58,7 +58,7 @@ int main(int argc,char **argv)
     
     do {
       double v;
-      minc2_iterator_get_value(input_it,&v);
+      minc2_iterator_get_values(input_it,&v);
       if(v<g_min) g_min=v;
       if(v>g_max) g_max=v;
       g_avg+=v;
@@ -90,8 +90,8 @@ int main(int argc,char **argv)
       do 
       {
         double v;
-        minc2_iterator_get_value(input_it,&v);
-        minc2_iterator_put_value(output_it,&v);
+        minc2_iterator_get_values(input_it,&v);
+        minc2_iterator_put_values(output_it,&v);
         cnt_o++;
         minc2_iterator_next(output_it); /*have to advance to make sure we flush data to disk*/
       } while(minc2_iterator_next(input_it)==MINC2_SUCCESS );

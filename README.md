@@ -4,8 +4,6 @@
 ## Goal
 To provide access to most functionality of MINC2 file format with minimal effort, with consistent interface
 
-
-
 ## Installing
 
 ### Common Requirements
@@ -47,5 +45,7 @@ To provide access to most functionality of MINC2 file format with minimal effort
     python setup.py build
     python setup.py install 
     ```
- * If libminc is not found: edit `python/minc2/build_minc2-simple.py` and set `minc_prefix`
+ * If libminc is not found: set environment `MINC_TOOLKIT`  variable to point to the base on installation
 
+
+ 
