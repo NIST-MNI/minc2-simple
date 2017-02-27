@@ -6,7 +6,6 @@ require('torch')
 
 -- contents of ../src/minc2-simple.h :
 ffi.cdef[[
-
 /**
   * minc2 dimension types
   */
@@ -19,6 +18,7 @@ enum  minc2_dimensions {
   MINC2_DIM_VEC,
   MINC2_DIM_END=255
 };
+
 
 /**
  * minc2 data storage type
@@ -76,6 +76,13 @@ struct minc2_dimension
  */
 struct minc2_info_iterator;
 typedef struct minc2_info_iterator* minc2_info_iterator_handle;
+
+
+/**
+ *
+ */
+struct minc2_file_iterator;
+typedef struct minc2_file_iterator* minc2_file_iterator_handle;
 
 
 /**
@@ -410,7 +417,6 @@ int minc2_xfm_get_linear_transform(minc2_xfm_file_handle h,int n,double *matrix)
  */
 int minc2_xfm_get_grid_transform(minc2_xfm_file_handle h,int n,int *inverted,char **grid_file);
 
-
 /**
  * Adds another  transform, a 4x4 matrix , in a row-major fashion
  */
@@ -421,11 +427,32 @@ int minc2_xfm_append_linear_transform(minc2_xfm_file_handle h,double *matrix);
  */
 int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_path,int inv);
 
-
 /**
  * Concatenate another general xfm transform
  */
 int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
+
+
+/**
+ * Iterators
+ */
+minc2_file_iterator_handle minc2_iterator_allocate0(void);
+int minc2_iterator_free(minc2_file_iterator_handle h);
+
+int minc2_iterator_input_start (minc2_file_iterator_handle h,minc2_file_handle m,int data_type);
+int minc2_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle m,int data_type);
+
+
+int minc2_multi_iterator_input_start (minc2_file_iterator_handle h,minc2_file_handle *m,int data_type,int fnum);
+int minc2_multi_iterator_output_start(minc2_file_iterator_handle h,minc2_file_handle *m,int data_type,int fnum);
+
+
+int minc2_iterator_next(minc2_file_iterator_handle h);
+/*int minc2_iterator_flush(minc2_file_iterator_handle h);*/
+
+int minc2_iterator_get_values(minc2_file_iterator_handle h,void *val);
+int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val);
+
 ]]
 
 local lib = ffi.load("minc2-simple") -- for now fixed path
