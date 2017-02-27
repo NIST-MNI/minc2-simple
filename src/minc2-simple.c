@@ -537,6 +537,21 @@ _GET_BUFFER_MIN_MAX(type_out,buffer,buffer_length,buffer_min,buffer_max) \
     }\
   }
 
+#define \
+_GET_BUFFER_MIN_MAX_PROT(type_out,buffer,buffer_length,buffer_min,buffer_max) \
+  { \
+    size_t _i;\
+    const type_out *_buffer = (const type_out *)buffer; \
+    buffer_min=buffer_max=FP_NAN; \
+    for(_i=0;_i<buffer_length;_i++,_buffer++)\
+    {\
+      if( isfinite(*_buffer) ) {\
+      if( *_buffer > buffer_max || !isfinite(buffer_max) ) buffer_max=*_buffer; \
+      if( *_buffer < buffer_min || !isfinite(buffer_min) ) buffer_min=*_buffer; \
+      } \
+    }\
+  }
+
 
 int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int representation_type)
 {
@@ -547,7 +562,14 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
   int err=MINC2_SUCCESS;
   size_t   buffer_length=1;
   double   buffer_min,buffer_max;
-  
+
+  if(h->slice_scaling_flag)
+  {
+    /*currently not supported*/
+    MI_LOG_ERROR(MI2_MSG_GENERIC,"Slice scaling in minc2_save_complete_volume is not supported yet");
+    return MINC2_ERROR;
+  }
+
   if(h->using_apparent_order)
   {
     /*need to specify dimensions in apparent order, with minc2 convention that fasted dimensions are last*/
@@ -566,7 +588,6 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
       buffer_length*=h->tmp_count[i];
     }
   }
-  
   buffer_type=_minc2_type_to_mitype(representation_type);
   switch(representation_type )
   {
@@ -589,16 +610,15 @@ int minc2_save_complete_volume( minc2_file_handle h,const void *buffer,int repre
       _GET_BUFFER_MIN_MAX(int,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_FLOAT:
-      _GET_BUFFER_MIN_MAX(float,buffer,buffer_length,buffer_min,buffer_max);
+      _GET_BUFFER_MIN_MAX_PROT(float,buffer,buffer_length,buffer_min,buffer_max);
       break;
     case MINC2_DOUBLE:
-      _GET_BUFFER_MIN_MAX(double,buffer,buffer_length,buffer_min,buffer_max);
+      _GET_BUFFER_MIN_MAX_PROT(double,buffer,buffer_length,buffer_min,buffer_max);
       break;
     default:
       MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
       return MINC2_ERROR;
   }
-  
   if(minc2_set_volume_range(h,buffer_min,buffer_max)!=MINC2_SUCCESS)
     return MINC2_ERROR;
 
@@ -882,27 +902,27 @@ int minc2_create(minc2_file_handle h,const char * path)
     return MINC2_ERROR;
   }
 
-  if(h->global_scaling_flag)
+  if(h->global_scaling_flag || h->slice_scaling_flag)
   {
     switch(h->store_type)
     {
       case MI_TYPE_BYTE:
-        if(miset_volume_valid_range(h->vol,SCHAR_MAX,SCHAR_MIN)<0) err=MINC2_ERROR;
+        if(miset_volume_valid_range(h->vol,SCHAR_MAX-1,SCHAR_MIN)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_UBYTE:
-        if(miset_volume_valid_range(h->vol,UCHAR_MAX,0)<0) err=MINC2_ERROR;
+        if(miset_volume_valid_range(h->vol,UCHAR_MAX-1,0)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_SHORT:
-        if(miset_volume_valid_range(h->vol,SHRT_MAX,SHRT_MIN)<0) err=MINC2_ERROR;
+        if(miset_volume_valid_range(h->vol,SHRT_MAX-1,SHRT_MIN)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_USHORT:
-        if(miset_volume_valid_range(h->vol,USHRT_MAX,0)<0) err=MINC2_ERROR;
+        if(miset_volume_valid_range(h->vol,USHRT_MAX-1,0)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_INT:
-        if(miset_volume_valid_range(h->vol,INT_MAX,INT_MIN)<0) err=MINC2_ERROR;
+        if(miset_volume_valid_range(h->vol,INT_MAX-1,INT_MIN)<0) err=MINC2_ERROR;
         break;
       case MI_TYPE_UINT:
-        if(miset_volume_valid_range(h->vol,UINT_MAX,0)<0) err=MINC2_ERROR;
+        if(miset_volume_valid_range(h->vol,UINT_MAX-1,0)<0) err=MINC2_ERROR;
         break;
       default:
         /*error*/
@@ -1734,10 +1754,10 @@ static int minc2_iterator_flush(minc2_file_iterator_handle h)
             _GET_BUFFER_MIN_MAX(int,f_buffer,h->_buffer_size,buffer_min,buffer_max);
             break;
           case MINC2_FLOAT:
-            _GET_BUFFER_MIN_MAX(float,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+            _GET_BUFFER_MIN_MAX_PROT(float,f_buffer,h->_buffer_size,buffer_min,buffer_max);
             break;
           case MINC2_DOUBLE:
-            _GET_BUFFER_MIN_MAX(double,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+            _GET_BUFFER_MIN_MAX_PROT(double,f_buffer,h->_buffer_size,buffer_min,buffer_max);
             break;
           default:
             MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
