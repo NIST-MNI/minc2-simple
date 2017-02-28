@@ -3,7 +3,7 @@
 # Vladimir S. FONOV - vladimir.fonov@gmail.com
 
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-PROJECT(minc2-simple C)
+PROJECT(minc2-simple C CXX)
 INCLUDE(CTest)
 
 FIND_PATH( MINC_TOOLKIT_DIR bin/mincstats  HINTS /opt/minc DOC "minc-toolkit install prefix")
