@@ -122,8 +122,7 @@ int main(int argc, char *argv[]) {
             voxel_data["voxel"]=Rcpp::NumericVector(voxels.begin(),voxels.end());
             R.parseEval("res=summary(lm(voxel~.,data=voxel_data))");
             Rcpp::NumericVector qq=R.parseEval("res$fstatistic");
-            //std::cout<<qq.size()<<std::endl;
-            //Rcpp::NumericVector fstat=Rcpp::as<Rcpp::NumericVector>(qq["fstatistic"]);
+            
             double val=qq[0];
             minc2_iterator_put_values(output_minc_it,&val);
             
