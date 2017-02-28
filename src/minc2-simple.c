@@ -1723,8 +1723,8 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle *
 static int minc2_iterator_flush(minc2_file_iterator_handle h)
 {
   int i,f;
-
-  for(f=0;f<h->_fnum;f++)
+  int r=1;
+  for(f=0;f< h->_fnum; f++)
   {
     void *f_buffer=h->_buffer + h->_buffer_size*h->_element_size*f;
 
@@ -1768,12 +1768,12 @@ static int minc2_iterator_flush(minc2_file_iterator_handle h)
           return MINC2_ERROR;
       }
 
-      return minc2_write_hyperslab(h->_minc_file[f], h->_index,h->_count, f_buffer, h->_data_type);
+      r=minc2_write_hyperslab(h->_minc_file[f], h->_index,h->_count, f_buffer, h->_data_type)==MINC2_SUCCESS&&r;
     } else {
-      return minc2_read_hyperslab( h->_minc_file[f], h->_index,h->_count, f_buffer, h->_data_type);
+      r=minc2_read_hyperslab( h->_minc_file[f], h->_index,h->_count, f_buffer, h->_data_type)==MINC2_SUCCESS&&r;
     }
   }
-  return MINC2_SUCCESS;
+  return r?MINC2_SUCCESS:MINC2_ERROR;
 }
 
 
