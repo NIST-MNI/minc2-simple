@@ -198,6 +198,17 @@ int minc2_get_representation_dimensions(minc2_file_handle h,struct minc2_dimensi
 int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims);
 
 /**
+ * Compare if volumes have compatible storage space (ignore spacing, direction cosines, etc)
+ */
+int minc2_compare_voxel_dimensions(const struct minc2_dimension *one,const struct minc2_dimension *two);
+
+/**
+ * Compare if volumes have compatible everything
+ */
+int minc2_compare_dimensions(const struct minc2_dimension *one,const struct minc2_dimension *two);
+
+
+/**
  * Load complete volume into memory
  */
 int minc2_load_complete_volume(minc2_file_handle h,void *buffer,int representation_type);

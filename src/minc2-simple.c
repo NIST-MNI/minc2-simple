@@ -442,6 +442,8 @@ int minc2_setup_standard_order(minc2_file_handle h)
       usable_dimensions++;
     }
   }
+  h->representation_dims[usable_dimensions].id=MINC2_DIM_END; /*mark the end*/
+
   /*Set apparent dimension order to the MINC2 api*/
   if(miset_apparent_dimension_order(h->vol, usable_dimensions, h->apparent_dims)<0)
     return MINC2_ERROR;  
@@ -760,6 +762,57 @@ int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims
   return MINC2_SUCCESS;
 }
 
+int minc2_compare_voxel_dimensions(const struct minc2_dimension *one,const struct minc2_dimension *two)
+{
+  while(one->id!=MINC2_DIM_END && two->id!=MINC2_DIM_END)
+  {
+    if(one->id!=two->id)
+      return MINC2_ERROR;
+    if(one->length!=two->length)
+      return MINC2_ERROR;
+
+    one++;
+    two++;
+  };
+
+  return one->id==MINC2_DIM_END && two->id==MINC2_DIM_END?MINC2_SUCCESS:MINC2_ERROR;
+}
+
+
+int minc2_compare_dimensions(const struct minc2_dimension *one,const struct minc2_dimension *two)
+{
+  int i;
+  while(one->id!=MINC2_DIM_END && two->id!=MINC2_DIM_END)
+  {
+    if(one->id!=two->id)
+      return MINC2_ERROR;
+
+    if(one->length!=two->length)
+      return MINC2_ERROR;
+
+    if(fabs(one->step-two->step)>1e-6)
+      return MINC2_ERROR;
+
+    if(one->irregular!=two->irregular)
+      return MINC2_ERROR;
+
+    if(fabs(one->start-two->start)>1e-6)
+      return MINC2_ERROR;
+
+    if(one->have_dir_cos && two->have_dir_cos)
+    {
+      for(i=0;i<3;i++)
+        if(fabs(one->dir_cos[i]-two->dir_cos[i])>1e-6)
+          return MINC2_ERROR;
+    }
+
+    one++;
+    two++;
+  };
+
+  return one->id==MINC2_DIM_END && two->id==MINC2_DIM_END?MINC2_SUCCESS:MINC2_ERROR;
+}
+
 
 int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int store_data_type,int data_type)
 {
@@ -880,7 +933,6 @@ int minc2_create(minc2_file_handle h,const char * path)
       return MINC2_ERROR;
     }
   }
-
 
   if ( micreate_volume ( path, h->ndims, h->file_dims, h->store_type,
                          MI_CLASS_REAL, hprops, &h->vol )<0 ) /*change MI_CLASS_REAL to something else?*/
@@ -1239,7 +1291,7 @@ int minc2_iterator_attribute_next(minc2_info_iterator_handle it)
   }
   if(!it->_it)
   {
-    MI_LOG_ERROR(MI2_MSG_GENERIC,"Iterator not started");
+            MI_LOG_ERROR(MI2_MSG_GENERIC,"Iterator not started");
     return MINC2_ERROR;
   }
 
@@ -1680,7 +1732,15 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle *
 
   memcpy(h->_minc_file,m,sizeof(minc2_file_handle)*fnumber);
 
-  /*TODO: add check that all volumes are the same size and specs*/
+  for(i=1;i<fnumber;i++)
+  {
+    if(minc2_compare_voxel_dimensions(h->_minc_file[0]->representation_dims,h->_minc_file[i]->representation_dims)!=MINC2_SUCCESS)
+    {
+      MI_LOG_ERROR(MI2_MSG_GENERIC,"Iterator: files have incompatible dimensions: %d and %d",0,i);
+      return MINC2_ERROR;
+    }
+  }
+
   h->_ndim=h->_minc_file[0]->ndims;
 
   h->_index=(int*)realloc(h->_index,sizeof(int)*h->_ndim);

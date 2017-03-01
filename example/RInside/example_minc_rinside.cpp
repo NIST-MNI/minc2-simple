@@ -122,12 +122,13 @@ int main(int argc, char *argv[]) {
             voxel_data["voxel"]=Rcpp::NumericVector(voxels.begin(),voxels.end());
             R.parseEval("res=summary(lm(voxel~.,data=voxel_data))");
             Rcpp::NumericVector qq=R.parseEval("res$fstatistic");
-            
             double val=qq[0];
+            //double val=Rcpp::as<double>(R.parseEval("mean(voxel_data$voxel)"));
+            
             minc2_iterator_put_values(output_minc_it,&val);
             
             minc2_iterator_next(output_minc_it);
-            if((cnt%100)==1)
+            if((cnt%1000)==1)
                 std::cout<<cnt<<"\t"<<std::flush;
             
         } while(minc2_iterator_next(input_minc_it)==MINC2_SUCCESS);
