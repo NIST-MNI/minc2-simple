@@ -1,7 +1,8 @@
 import os
 import sys
 from cffi import FFI
-
+from sys import platform
+  
 ffi = FFI()
 
 minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.13")
@@ -12,6 +13,13 @@ src=""
 with open(os.path.join(source_path,"minc2-simple.c"),'r') as f:
     src=f.read()
 
+_extra_link_args=[]
+
+if platform == "linux" or platform == "linux2":
+  _extra_link_args=['-Wl,-rpath={}'.format(os.path.join(minc_prefix,"lib"))]
+elif platform == "darwin":
+  _extra_link_args=['-Xlinker','-rpath','-Xlinker',os.path.join(minc_prefix,"lib")]
+
 ffi.set_source("minc2._simple",
     src,
     # The important thing is to include libc in the list of libraries we're
@@ -19,11 +27,13 @@ ffi.set_source("minc2._simple",
     libraries=["minc2","c"],
     include_dirs=[os.path.join(minc_prefix,"include"),source_path],
     library_dirs=[os.path.join(minc_prefix,"lib")],
-    extra_link_args=['-Wl,-rpath={}'.format(os.path.join(minc_prefix,"lib"))]
+    extra_link_args=_extra_link_args
 )
 
 ffi.cdef(
     """
+
+
 /**
   * minc2 dimension types
   */ 
@@ -214,6 +224,17 @@ int minc2_get_representation_dimensions(minc2_file_handle h,struct minc2_dimensi
  * get dimension information in file format
  */
 int minc2_get_store_dimensions(minc2_file_handle h,struct minc2_dimension **dims);
+
+/**
+ * Compare if volumes have compatible storage space (ignore spacing, direction cosines, etc)
+ */
+int minc2_compare_voxel_dimensions(const struct minc2_dimension *one,const struct minc2_dimension *two);
+
+/**
+ * Compare if volumes have compatible everything
+ */
+int minc2_compare_dimensions(const struct minc2_dimension *one,const struct minc2_dimension *two);
+
 
 /**
  * Load complete volume into memory
@@ -470,7 +491,6 @@ int minc2_iterator_next(minc2_file_iterator_handle h);
 
 int minc2_iterator_get_values(minc2_file_iterator_handle h,void *val);
 int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val);
-
     """
     )
 
