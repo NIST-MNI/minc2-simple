@@ -541,6 +541,21 @@ function minc2_file:representation_dims()
     return dims[0]
 end
 
+-- provide volume size, using current representation
+function minc2_file:volume_size()
+
+    local _dims=self:representation_dims()
+    local ndims=self:ndim()
+
+    local sz=torch.LongStorage(ndims)
+    local i
+
+    for i=1,ndims do
+        sz[i+1]=_dims[ndims-i-1].length
+    end
+    return sz
+end
+
 
 -- define a new volume
 function minc2_file:define(dims,store_type,representation_type)
@@ -571,34 +586,6 @@ function minc2_file:copy_metadata(another)
     assert(lib.minc2_copy_metadata(another._v,self._v)==ffi.C.MINC2_SUCCESS)
 end
 
--- function minc2_file:load_complete_volume(data_type)
---     data_type=data_type or ffi.C.MINC2_FLOAT
---     buf_len=ffi.new("int[1]")
---     lib.minc2_nelement(self._v,buf_len)
---     buf_len=buf_len[0]
---     buf=nil
---     if data_type==ffi.C.MINC2_BYTE then 
---         buf=ffi.new("int8_t[?]",buf_len)
---     elseif data_type==ffi.C.MINC2_UBYTE then 
---         buf=ffi.new("uint8_t[?]",buf_len)
---     elseif data_type==ffi.C.MINC2_SHORT then 
---         buf=ffi.new("int16_t[?]",buf_len)
---     elseif data_type==ffi.C.MINC2_USHORT then 
---         buf=ffi.new("uint16_t[?]",buf_len)
---     elseif data_type==ffi.C.MINC2_INT then 
---         buf=ffi.new("int32_t[?]",buf_len)
---     elseif data_type==ffi.C.MINC2_UINT then 
---         buf=ffi.new("uint32_t[?]",buf_len)
---     elseif data_type==ffi.C.MINC2_FLOAT then 
---         buf=ffi.new("float[?]",buf_len)
---     elseif data_type==ffi.C.MINC2_DOUBLE then 
---         buf=ffi.new("double[?]",buf_len)
---     else
---         assert(false,"Unsupported  yet")
---     end
---     assert(lib.minc2_load_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
---     return buf
--- end
 
 function minc2_file:load_complete_volume(data_type)
     -- will be torch tensors
@@ -718,13 +705,6 @@ end
 function minc2_file:setup_standard_order()
     assert( lib.minc2_setup_standard_order(self._v) == ffi.C.MINC2_SUCCESS)
 end
-
--- function minc2_file:save_complete_volume(buf,data_type)
---     data_type=data_type or ffi.C.MINC2_FLOAT
---     assert(buf~=nil)
---     assert(lib.minc2_save_complete_volume(self._v,buf,data_type)==ffi.C.MINC2_SUCCESS)
---     return buf
--- end
 
 
 function minc2_file:save_complete_volume(buf)
