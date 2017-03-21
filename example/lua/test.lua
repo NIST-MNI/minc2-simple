@@ -11,6 +11,10 @@ for i=0,(qqq:ndim()-1) do -- contrary to common LUA convention, it is 0-based
         i,dims[i].length,dims[i].id,dims[i].start,dims[i].step))
 end
 
+print("Representation volume size:")
+print(qqq:volume_size())
+
+
 ooo=minc2_file.new()
 -- will create file with same dimensions
 
@@ -36,6 +40,9 @@ ooo:write_metadata(m)
 
 -- going to read and write in standard order (XYZ)
 qqq:setup_standard_order()
+print("Representation volume size again (standard mode):")
+print(qqq:volume_size())
+
 
 -- let's check coordinate transfer
 my_dims=qqq:representation_dims()

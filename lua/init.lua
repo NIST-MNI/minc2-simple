@@ -551,11 +551,10 @@ function minc2_file:volume_size()
     local i
 
     for i=1,ndims do
-        sz[i+1]=_dims[ndims-i-1].length
+        sz[i]=_dims[ndims-i].length
     end
     return sz
 end
-
 
 -- define a new volume
 function minc2_file:define(dims,store_type,representation_type)
@@ -627,7 +626,7 @@ function minc2_file:load_complete_volume(data_type)
     assert( 
         lib.minc2_load_complete_volume(self._v, buf:storage():data(), data_type)==ffi.C.MINC2_SUCCESS 
     )
-    
+
     return buf
 end
 
