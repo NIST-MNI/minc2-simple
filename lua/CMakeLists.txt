@@ -24,6 +24,7 @@ INCLUDE_DIRECTORIES(../src)
 #FILE(GLOB luasrc *.lua)
 SET(SRC
  ../src/minc2-simple.c
+ ../src/minc2-matrix-ops.c
 )
 #SET(CMAKE_C_FLAGS "-fPIC ${CMAKE_C_FLAGS}")
 

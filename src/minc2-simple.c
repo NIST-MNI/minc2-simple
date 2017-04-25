@@ -43,7 +43,7 @@ VIO_BOOL extract2_parameters_from_matrix(VIO_Transform *trans,
                                          double *translations,
                                          double *scales,
                                          double *shears,
-                                         double *rotations)
+                                         double *rotations);
 
 
 /**
