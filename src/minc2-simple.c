@@ -16,6 +16,36 @@ static int      _minc2_cleanup_dimensions(minc2_file_handle h);
 static mitype_t _minc2_type_to_mitype(int minc2_type);
 static int      _mitype_to_minc2_type(mitype_t t);
 
+
+/*these functions are defined in minc2-matrix-ops*/
+/* ----------------------------- MNI Header -----------------------------------
+@NAME       : build_transformation_matrix
+@INPUT      : center, translations, scales, rotations
+@OUTPUT     : *lt->mat - a linear transformation matrix
+@RETURNS    : nothing
+@DESCRIPTION: mat = (T)(C)(S)(SH)(R)(-C)
+               the matrix is to be  PREmultiplied with a column vector (mat*colvec)
+               when used in the application
+---------------------------------------------------------------------------- */
+void build_transformation_matrix(VIO_Transform *trans,
+                                  double *center,
+                                  double *translations,
+                                  double *scales,
+                                  double *shears,
+                                  double *rotations);
+
+/* extract parameters from linear transform
+   trans = [scale][shear][rot]
+         = [scale][shear][rz][ry][rx];
+                                  */
+VIO_BOOL extract2_parameters_from_matrix(VIO_Transform *trans,
+                                         double *center,
+                                         double *translations,
+                                         double *scales,
+                                         double *shears,
+                                         double *rotations)
+
+
 /**
  * internal representation of the minc file
  */
@@ -1671,6 +1701,73 @@ int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o)
   }
   return MINC2_SUCCESS;
 }
+
+
+
+int minc2_xfm_append_linear_param(minc2_xfm_file_handle h,
+                              double *center,
+                              double *translations,
+                              double *scales,
+                              double *shears,
+                              double *rotations)
+{
+  int n;
+  int i,j;
+  VIO_Transform lin;
+  memset(&lin, 0, sizeof(VIO_Transform));
+
+  build_transformation_matrix(&lin,
+                              center, translations,
+                              scales, shears, rotations);
+                              
+  minc2_xfm_get_n_concat(h,&n);
+
+  if(n==0) /*first transform*/
+  {
+    create_linear_transform(&h->xfm, &lin);
+    return MINC2_SUCCESS;
+  } else {
+    VIO_General_transform lin_xfm;
+    VIO_General_transform concated;
+
+    memset(&lin_xfm, 0, sizeof(VIO_General_transform));
+    create_linear_transform(&lin_xfm, &lin);
+
+    concat_general_transforms( &h->xfm, &lin_xfm, &concated );
+    delete_general_transform( &h->xfm );
+    delete_general_transform( &lin_xfm );
+    h->xfm = concated;
+    return MINC2_SUCCESS;
+  }
+  
+}
+
+int minc2_xfm_extract_linear_param(minc2_xfm_file_handle h,
+                             int n,
+                             double *center,
+                             double *translations,
+                             double *scales,
+                             double *shears,
+                             double *rotations)
+{
+  int i,j;
+  VIO_Transform *lin;
+  VIO_General_transform *_xfm=_get_nth_transform(&h->xfm, n);
+  if(_xfm)
+  {
+    lin=get_linear_transform_ptr(_xfm);
+    
+    return extract2_parameters_from_matrix(lin, center,
+                                    translations,
+                                    scales,
+                                    shears,rotations)?MINC2_SUCCESS:MINC2_ERROR;
+    
+    
+  } else {
+    return MINC2_ERROR;
+  }
+}
+
 
 
 /**

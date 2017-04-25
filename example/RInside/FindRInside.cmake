@@ -6,13 +6,13 @@ set (RPATH "R")
 set (RSCRIPT_PATH "Rscript")
 
 if (CMAKE_HOST_WIN32)
-    execute_process(COMMAND ${RSCRIPT_PATH} -e "cat(.Platform$r_arch)"
-                    OUTPUT_VARIABLE R_ARCH)
+  execute_process(COMMAND ${RSCRIPT_PATH} -e "cat(.Platform$r_arch)"
+                  OUTPUT_VARIABLE R_ARCH)
 		
 	execute_process(COMMAND ${RPATH} --arch ${R_ARCH} RHOME
                     OUTPUT_VARIABLE R_HOME)
 	
-    string(REPLACE "\\" "/" R_HOME ${R_HOME})	
+  string(REPLACE "\\" "/" R_HOME ${R_HOME})	
 	
 	set (RPATH ${R_HOME}/bin/R)
 endif()
@@ -51,22 +51,31 @@ if (${RLDFLAGS} MATCHES "[-][l]([^;])+")
 endif()
 
 execute_process(COMMAND ${RSCRIPT_PATH} -e "Rcpp:::CxxFlags()"
-                OUTPUT_VARIABLE RCPPINCL)
-string(SUBSTRING ${RCPPINCL} ${NUM_TRUNC_CHARS} -1 RCPPINCL)
-#include_directories(${RCPPINCL})
-SET(RINSIDE_INCLUDE_DIR ${RINSIDE_INCLUDE_DIR} ${RCPPINCL})
+                OUTPUT_VARIABLE RCPPINCL
+                RESULT_VARIABLE RCPPERR)
+                
+IF(NOT RCPPERR ) 
+  string(SUBSTRING ${RCPPINCL} ${NUM_TRUNC_CHARS} -1 RCPPINCL)
+  SET(RINSIDE_INCLUDE_DIR ${RINSIDE_INCLUDE_DIR} ${RCPPINCL})
 
-execute_process(COMMAND ${RSCRIPT_PATH} -e "Rcpp:::LdFlags()"
-                OUTPUT_VARIABLE RCPPLIBS)
+  execute_process(COMMAND ${RSCRIPT_PATH} -e "Rcpp:::LdFlags()"
+                  OUTPUT_VARIABLE RCPPLIBS)
+
+ENDIF()
+
 
 execute_process(COMMAND ${RSCRIPT_PATH} -e "RInside:::CxxFlags()"
-                OUTPUT_VARIABLE RINSIDEINCL)
-string(SUBSTRING ${RINSIDEINCL} ${NUM_TRUNC_CHARS} -1 RINSIDEINCL)
-#include_directories(${RINSIDEINCL})
-SET(RINSIDE_INCLUDE_DIR ${RINSIDE_INCLUDE_DIR} ${RINSIDEINCL})
+                OUTPUT_VARIABLE RINSIDEINCL
+                RESULT_VARIABLE RINSIDEERR
+              )
+              
+IF(NOT RINSIDEERR ) 
+  string(SUBSTRING ${RINSIDEINCL} ${NUM_TRUNC_CHARS} -1 RINSIDEINCL)
+  SET(RINSIDE_INCLUDE_DIR ${RINSIDE_INCLUDE_DIR} ${RINSIDEINCL})
+  execute_process(COMMAND ${RSCRIPT_PATH} -e "RInside:::LdFlags()"
+                  OUTPUT_VARIABLE RINSIDELIBS)
+ENDIF()
 
-execute_process(COMMAND ${RSCRIPT_PATH} -e "RInside:::LdFlags()"
-                OUTPUT_VARIABLE RINSIDELIBS)
 
 if (CMAKE_HOST_WIN32)
     string(LENGTH "libRcpp.a" lenRcppName)
@@ -132,7 +141,11 @@ execute_process(COMMAND ${RPATH} CMD config LAPACK_LIBS
 #set(CMAKE_CXX_FLAGS "-W -Wall -pedantic -Wextra ${CMAKE_CXX_FLAGS}")
 #SET(RINSIDE_FLAGS )
 SET(RINSIDE_LIBS ${RLDFLAGS_l} ${BLAS_LIBS} ${LAPACK_LIBS} ${RINSIDELIBS_l} ${RCPPLIBS_l})
-SET(RINSIDE_FOUND TRUE)
+IF(RCPPERR  OR RINSIDEERR)
+  SET(RINSIDE_FOUND FALSE)
+ELSE()
+  SET(RINSIDE_FOUND TRUE)
+ENDIF()
 
 # foreach (next_SOURCE ${sources})
 #    get_filename_component(source_name ${next_SOURCE} NAME_WE)

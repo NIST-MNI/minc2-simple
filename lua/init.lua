@@ -433,6 +433,30 @@ int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_pa
 int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
 
 
+
+/**
+ * Generate linear transform based on parameters and append it
+ */
+int minc2_xfm_append_linear_param(minc2_xfm_file_handle h,
+                              double *center,
+                              double *translations,
+                              double *scales,
+                              double *shears,
+                              double *rotations);
+
+/**
+* Extract linear parameters from the transform
+* center have to be specied
+*/
+int minc2_xfm_extract_linear_param(minc2_xfm_file_handle h,
+                             int n,
+                             double *center,
+                             double *translations,
+                             double *scales,
+                             double *shears,
+                             double *rotations);
+
+
 /**
  * Iterators
  */
@@ -1091,10 +1115,54 @@ function minc2_xfm:get_linear_transform(n)
     return mat
 end
 
+function minc2_xfm:get_linear_transform_param(n,center)
+    local n=n or 0
+    
+    local _center=torch.Tensor(3):zero()
+    if center ~= nil then
+      _center=torch.Tensor(center)
+    end
+    
+    local transform={
+      center=_center,
+      translations=torch.Tensor(3):zero(),
+      scales=torch.Tensor(3):zero(),
+      shears=torch.Tensor(3):zero(),
+      rotations=torch.Tensor(3):zero() }
+    
+    assert(lib.minc2_xfm_extract_linear_param(self._v,n,
+        transform.center:storage():data(),
+        transform.translations:storage():data(),
+        transform.scales:storage():data(),
+        transform.shears:storage():data(),
+        transform.rotations:storage():data()
+       )==ffi.C.MINC2_SUCCESS)
+    return transform
+end
+
 function minc2_xfm:append_linear_transform(mat)
     assert(lib.minc2_xfm_append_linear_transform(self._v,mat:storage():data())==ffi.C.MINC2_SUCCESS)
     return self
 end
+
+function minc2_xfm:append_linear_transform_param(transform)
+    assert(transform and
+           transform.center and 
+           transform.translations and 
+           transform.scales and 
+           transform.shears and 
+           transform.rotations)
+    
+    assert(lib.minc2_xfm_append_linear_param(self._v,
+           transform.center:storage():data(),
+           transform.translations:storage():data(),
+           transform.scales:storage():data(),
+           transform.shears:storage():data(),
+           transform.rotations:storage():data()
+           )==ffi.C.MINC2_SUCCESS)
+    return self
+end
+
 
 function minc2_xfm:append_grid_transform(grid_file,inv)
     local inv=inv or 0

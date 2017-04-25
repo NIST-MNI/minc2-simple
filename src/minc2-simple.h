@@ -445,6 +445,29 @@ int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
 
 
 /**
+ * Generate linear transform based on parameters and append it
+ */
+int minc2_xfm_append_linear_param(minc2_xfm_file_handle h,
+                              double *center,
+                              double *translations,
+                              double *scales,
+                              double *shears,
+                              double *rotations);
+
+/**
+* Extract linear parameters from the transform
+* center have to be specied
+*/
+int minc2_xfm_extract_linear_param(minc2_xfm_file_handle h,
+                             int n,
+                             double *center,
+                             double *translations,
+                             double *scales,
+                             double *shears,
+                             double *rotations);
+
+
+/**
  * Iterators
  */
 minc2_file_iterator_handle minc2_iterator_allocate0(void);

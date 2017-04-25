@@ -1218,7 +1218,7 @@ void build_transformation_matrix(VIO_Transform *trans,
 
   nr_identf(C,1,4,1,4);      /* make center          */
   for(i=0; i<3; i++) {
-    C[1+i][4] = -center[i];                
+    C[1+i][4] = -center[i];
   }
 
   nr_multf(T, 1,4,1,4, S  ,1,4,1,4, T1 );  
@@ -1234,7 +1234,7 @@ void build_transformation_matrix(VIO_Transform *trans,
   VIO_FREE2D(SH   );
   VIO_FREE2D(S    );
   VIO_FREE2D(R    );
-  VIO_FREE2D(C );
+  VIO_FREE2D(C    );
   VIO_FREE2D(T1   );
   VIO_FREE2D(T2   );
   VIO_FREE2D(T3   );
