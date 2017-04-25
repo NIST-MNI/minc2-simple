@@ -1,10 +1,12 @@
 ADD_LIBRARY(minc2-simple SHARED
             minc2-simple.c
+            minc2-matrix-ops.c
             minc2-simple.h
             )
 
 ADD_LIBRARY(minc2-simple-static STATIC
              minc2-simple.c
+             minc2-matrix-ops.c
              minc2-simple.h
            )
             
