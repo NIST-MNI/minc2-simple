@@ -6,6 +6,25 @@ import six
 class minc2_error(Exception):
     pass
 
+class minc2_transform_parameters(object):
+    def __init__(self):
+        import numpy as np
+        self.center=np.zeros(3)
+        self.translations=np.zeros(3)
+        self.scales=np.zeros(3)
+        self.shears=np.zeros(3)
+        self.rotations=np.zeros(3)
+
+    def __str__(self):
+        return "center: {} {} {}\n".format(self.center[0],self.center[1],self.center[2])+ \
+               "translations: {} {} {}\n".format(self.translations[0],self.translations[1],self.translations[2])+ \
+               "scales: {} {} {}\n".format(self.scales[0],self.scales[1],self.scales[2])+ \
+               "rotations: {} {} {}\n".format(self.rotations[0],self.rotations[1],self.rotations[2])+ \
+               "shears: {} {} {}\n".format(self.shears[0],self.shears[1],self.shears[2])
+
+    def __repr__(self):
+        return self.__str__()
+
 class minc2_file(object):
 
     # constants
@@ -301,10 +320,45 @@ class minc2_xfm(object):
         assert(lib.minc2_xfm_get_linear_transform(self._v,n,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
         return _mat
 
-    def append_linear_transform(self,mat):
+    def get_linear_transform_param(self,n=0,center=None):
         import numpy as np
-        _mat=np.asarray(mat,'float64','C')
-        assert(lib.minc2_xfm_append_linear_transform(self._v,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
+        par=minc2_transform_parameters()
+
+        if center is not None:
+            par.center=np.asarray(center,'float64','C')
+
+        assert(lib.minc2_xfm_extract_linear_param(self._v,n,
+                ffi.cast("double *", par.center.ctypes.data),
+                ffi.cast("double *", par.translations.ctypes.data),
+                ffi.cast("double *", par.scales.ctypes.data),
+                ffi.cast("double *", par.shears.ctypes.data),
+                ffi.cast("double *", par.rotations.ctypes.data)
+            )==lib.MINC2_SUCCESS)
+        return par
+
+
+    def append_linear_transform(self,par):
+        import numpy as np
+        if isinstance(par,np.ndarray): # assume it's a matrix
+            _mat=np.asarray(par,'float64','C')
+            assert(lib.minc2_xfm_append_linear_transform(self._v,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
+        else: # must be an object with parameters
+            #assert(lib.minc2_xfm_append_linear_transform(self._v,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
+            _par=minc2_transform_parameters()
+
+            _par.center=np.asarray(par.center,'float64','C')
+            _par.translations=np.asarray(par.translations,'float64','C')
+            _par.scales=np.asarray(par.scales,'float64','C')
+            _par.shears=np.asarray(par.shears,'float64','C')
+            _par.rotations=np.asarray(par.rotations,'float64','C')
+
+            assert(lib.minc2_xfm_append_linear_param(self._v,
+                ffi.cast("double *", _par.center.ctypes.data),
+                ffi.cast("double *", _par.translations.ctypes.data),
+                ffi.cast("double *", _par.scales.ctypes.data),
+                ffi.cast("double *", _par.shears.ctypes.data),
+                ffi.cast("double *", _par.rotations.ctypes.data)
+                )==lib.MINC2_SUCCESS)
         return self
 
     def append_grid_transform(self,grid_file,inv=False):

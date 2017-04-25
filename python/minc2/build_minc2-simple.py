@@ -12,6 +12,8 @@ src=""
 
 with open(os.path.join(source_path,"minc2-simple.c"),'r') as f:
     src=f.read()
+with open(os.path.join(source_path,"minc2-matrix-ops.c"),'r') as f:
+    src+=f.read()
 
 _extra_link_args=[]
 
@@ -470,6 +472,30 @@ int minc2_xfm_append_grid_transform(minc2_xfm_file_handle h,const char * grid_pa
  * Concatenate another general xfm transform
  */
 int minc2_xfm_concat_xfm(minc2_xfm_file_handle h,minc2_xfm_file_handle o);
+
+
+/**
+ * Generate linear transform based on parameters and append it
+ */
+int minc2_xfm_append_linear_param(minc2_xfm_file_handle h,
+                              double *center,
+                              double *translations,
+                              double *scales,
+                              double *shears,
+                              double *rotations);
+
+/**
+* Extract linear parameters from the transform
+* center have to be specied
+*/
+int minc2_xfm_extract_linear_param(minc2_xfm_file_handle h,
+                             int n,
+                             double *center,
+                             double *translations,
+                             double *scales,
+                             double *shears,
+                             double *rotations);
+
 
 
 /**

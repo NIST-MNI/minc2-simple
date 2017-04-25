@@ -1140,29 +1140,27 @@ function minc2_xfm:get_linear_transform_param(n,center)
     return transform
 end
 
-function minc2_xfm:append_linear_transform(mat)
-    assert(lib.minc2_xfm_append_linear_transform(self._v,mat:storage():data())==ffi.C.MINC2_SUCCESS)
+function minc2_xfm:append_linear_transform(par)
+    if torch.type(par)=="torch.DoubleTensor" then
+        assert(lib.minc2_xfm_append_linear_transform(self._v,mat:storage():data())==ffi.C.MINC2_SUCCESS)
+    else --assume it is parameters table
+        assert(par and
+            par.center and
+            par.translations and
+            par.scales and
+            par.shears and
+            par.rotations)
+
+        assert(lib.minc2_xfm_append_linear_param(self._v,
+            par.center:storage():data(),
+            par.translations:storage():data(),
+            par.scales:storage():data(),
+            par.shears:storage():data(),
+            par.rotations:storage():data()
+            )==ffi.C.MINC2_SUCCESS)
+    end
     return self
 end
-
-function minc2_xfm:append_linear_transform_param(transform)
-    assert(transform and
-           transform.center and 
-           transform.translations and 
-           transform.scales and 
-           transform.shears and 
-           transform.rotations)
-    
-    assert(lib.minc2_xfm_append_linear_param(self._v,
-           transform.center:storage():data(),
-           transform.translations:storage():data(),
-           transform.scales:storage():data(),
-           transform.shears:storage():data(),
-           transform.rotations:storage():data()
-           )==ffi.C.MINC2_SUCCESS)
-    return self
-end
-
 
 function minc2_xfm:append_grid_transform(grid_file,inv)
     local inv=inv or 0
