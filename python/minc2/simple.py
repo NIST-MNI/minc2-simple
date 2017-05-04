@@ -14,6 +14,7 @@ class minc2_transform_parameters(object):
         self.scales=np.zeros(3)
         self.shears=np.zeros(3)
         self.rotations=np.zeros(3)
+        self.invalid=False
 
     def __str__(self):
         return "center: {} {} {}\n".format(self.center[0],self.center[1],self.center[2])+ \
@@ -326,14 +327,16 @@ class minc2_xfm(object):
 
         if center is not None:
             par.center=np.asarray(center,'float64','C')
+        # TODO: detect if extraction of parameters failed
 
-        assert(lib.minc2_xfm_extract_linear_param(self._v,n,
+        if lib.minc2_xfm_extract_linear_param(self._v,n,
                 ffi.cast("double *", par.center.ctypes.data),
                 ffi.cast("double *", par.translations.ctypes.data),
                 ffi.cast("double *", par.scales.ctypes.data),
                 ffi.cast("double *", par.shears.ctypes.data),
                 ffi.cast("double *", par.rotations.ctypes.data)
-            )==lib.MINC2_SUCCESS)
+            )!=lib.MINC2_SUCCESS:
+            par.invalid=True
         return par
 
 
@@ -343,7 +346,6 @@ class minc2_xfm(object):
             _mat=np.asarray(par,'float64','C')
             assert(lib.minc2_xfm_append_linear_transform(self._v,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
         else: # must be an object with parameters
-            #assert(lib.minc2_xfm_append_linear_transform(self._v,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
             _par=minc2_transform_parameters()
 
             _par.center=np.asarray(par.center,'float64','C')

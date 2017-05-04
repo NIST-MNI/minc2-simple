@@ -1128,15 +1128,21 @@ function minc2_xfm:get_linear_transform_param(n,center)
       translations=torch.Tensor(3):zero(),
       scales=torch.Tensor(3):zero(),
       shears=torch.Tensor(3):zero(),
-      rotations=torch.Tensor(3):zero() }
+      rotations=torch.Tensor(3):zero(),
+      invalid=false
+    }
     
-    assert(lib.minc2_xfm_extract_linear_param(self._v,n,
+    if lib.minc2_xfm_extract_linear_param(self._v,n,
         transform.center:storage():data(),
         transform.translations:storage():data(),
         transform.scales:storage():data(),
         transform.shears:storage():data(),
         transform.rotations:storage():data()
-       )==ffi.C.MINC2_SUCCESS)
+       )~=ffi.C.MINC2_SUCCESS then
+           transform.invalid=true
+    else
+        transform.invalid=false
+    end
     return transform
 end
 
