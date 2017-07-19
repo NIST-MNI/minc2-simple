@@ -1,5 +1,6 @@
-from minc2.simple import minc2_file
-from minc2.simple import minc2_xfm
+from minc2_simple import minc2_file
+from minc2_simple import minc2_xfm
+
 import sys
 import numpy as np
 

@@ -10,12 +10,12 @@ os.chdir(os.path.dirname(sys.argv[0]) or ".")
 print(find_packages())
 
 setup(
-    name = "minc2.simple",
+    name = "minc2_simple",
 #    packages = ["minc2.simple"],
     version="0.1",
     description="MINC2 Simple interface using CFFI",
-    long_description=open("README.md", "rt").read(),
-    url="https://github.com/vfonov/minc2.simple",
+    long_description=open("README.txt", "rt").read(),
+    url="https://github.com/vfonov/minc2_simple",
     author="Vladimir S. FONOV",
     author_email="vladimir.fonov@gmail.com",
     classifiers=[
@@ -29,6 +29,6 @@ setup(
     install_requires=["cffi>=1.0.0"],
     setup_requires=["cffi>=1.0.0"],
     cffi_modules=[
-        "./minc2/build_minc2.simple.py:ffi",
+        "./minc2_simple/minc2_simple_build.py:ffi",
     ],
 )

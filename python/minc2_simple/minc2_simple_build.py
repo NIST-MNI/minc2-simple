@@ -22,7 +22,7 @@ if platform == "linux" or platform == "linux2":
 elif platform == "darwin":
   _extra_link_args=['-Xlinker','-rpath','-Xlinker',os.path.join(minc_prefix,"lib")]
 
-ffi.set_source("minc2._simple",
+ffi.set_source("minc2_simple._simple",
     src,
     # The important thing is to include libc in the list of libraries we're
     # linking against:
