@@ -29,8 +29,8 @@ def do_cmd(cmds,verbose=False):
         raise Exception("ERROR: command {} failed {}!\nMessage: {}\n{}".format(str(cmds),str(outvalue),output_stderr,traceback.format_exc()))
     return outvalue
 
-def xfmavg(inputs,output,verbose=False):
-    # TODO: handl inversion flag correctly
+def xfmavg(inputs, output, verbose=False):
+    # TODO: handle inversion flag correctly
     all_linear=True
     all_nonlinear=True
     input_xfms=[]
@@ -79,7 +79,7 @@ def xfmavg(inputs,output,verbose=False):
         cmds.append(output_grid)
         do_cmd(cmds,verbose=verbose)
         x=minc2_xfm()
-        x.append_grid_transform(output_grid,false)
+        x.append_grid_transform(output_grid, False)
         x.save(output)
     else:
         raise Exception("Mixed XFM files provided as input")
