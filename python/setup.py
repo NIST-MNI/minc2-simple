@@ -31,4 +31,5 @@ setup(
     cffi_modules=[
         "./minc2_simple/minc2_simple_build.py:ffi",
     ],
+    test_suite="test"
 )

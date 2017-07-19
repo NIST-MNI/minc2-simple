@@ -581,7 +581,7 @@ function minc2_file:volume_size()
 end
 
 -- define a new volume
-function minc2_file:define(dims,store_type,representation_type)
+function minc2_file:define(dims, store_type, representation_type)
     assert(dims~=nil,"dims need to be defined")
     assert(store_type~=nil,"Store data type need to be set")
     assert(representation_type~=nil,"Data type need to be set")

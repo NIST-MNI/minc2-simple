@@ -98,26 +98,41 @@ class minc2_file(object):
         lib.minc2_get_representation_dimensions(self._v,dims)
         return dims[0]
     
-    def define(self,dims,store_type,representation_type):
+    def define(self, dims, store_type=None, representation_type=None):
         _dims=dims
+        if store_type is None:
+            store_type=lib.MINC2_SHORT
+        if representation_type is None:
+            representation_type=store_type
+
+        _store_type=store_type
+        _representation_type=representation_type
+
+        if isinstance(_store_type, six.string_types):
+            _store_type=__numpy_to_minc2[_store_type]
+
+        if isinstance(_representation_type, six.string_types):
+            _representation_type=__numpy_to_minc2[_representation_type]
+
         if isinstance(dims,list):
             _dims = ffi.new("struct minc2_dimension[]", len(dims)+1)
             for i,j in enumerate(dims):
                 _dims[i]=j
             _dims[len(dims)]={'id':lib.MINC2_DIM_END}
-        if lib.minc2_define(self._v,_dims,store_type,representation_type)!=lib.MINC2_SUCCESS:
+
+        if lib.minc2_define(self._v, _dims, _store_type, _representation_type)!=lib.MINC2_SUCCESS:
             raise minc2_error()
     
     
-    def create(self,path):
+    def create(self, path):
         if lib.minc2_create(self._v, to_bytes(path) )!=lib.MINC2_SUCCESS:
             raise minc2_error()
     
-    def copy_metadata(self,another):
+    def copy_metadata(self, another):
         if lib.minc2_copy_metadata(another._v,self._v)!=lib.MINC2_SUCCESS:
             raise minc2_error()
     
-    def load_complete_volume(self,data_type):
+    def load_complete_volume(self, data_type):
         import numpy as np
         
         buf=None
@@ -250,6 +265,17 @@ class minc2_file(object):
             for attr,a in six.iteritems(g):
                 self.write_attribute(group,attr,a)
 
+    def store_dtype(self):
+        _dtype=ffi.new("int*",0)
+        if lib.minc2_storage_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+        return minc2_file.__minc2_to_numpy[_dtype]
+
+    def representation_dtype(self):
+        _dtype=ffi.new("int*",0)
+        if lib.minc2_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+        return minc2_file.__minc2_to_numpy[_dtype]
 
 
 class minc2_xfm(object):
