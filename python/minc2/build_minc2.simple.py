@@ -5,7 +5,7 @@ from sys import platform
   
 ffi = FFI()
 
-minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.13")
+minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.15")
 source_path=os.path.join(os.path.dirname(__file__), "../../src")
 
 src=""
