@@ -40,12 +40,10 @@ To provide access to most functionality of MINC2 file format with minimal effort
     
 ### Python
  * Requirements: cffi, numpy, six
+ * Optional requirements: scipy
  * Installation:
     ```
-    python setup.py build
-    python setup.py install 
+    python python/setup.py build
+    python python/setup.py install 
     ```
  * If libminc is not found: set environment `MINC_TOOLKIT`  variable to point to the base on installation
-
-
- 
