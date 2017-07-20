@@ -75,8 +75,12 @@ def tearDownModule():
     os.remove(inputFile_ushort)
     os.remove(inputFile_uint)
     os.remove(inputVector)
-    os.remove(newFilename)
     os.remove(input3DdirectionCosines)
+    
+    if os.path.exists(outputFilename):
+        os.remove(outputFilename)
+    if os.path.exists(newFilename):
+        os.remove(newFilename)
     os.remove(outputXfmFilename1)
     os.remove(outputXfmFilename2)
     os.remove(outputXfmFilename3)
@@ -237,21 +241,26 @@ class TestHyperslabs(unittest.TestCase):
     def testSetHyperslab(self):
         """setting hyperslab should change underlying volume"""
         v = minc2_file(inputFile_ushort)
-        v2 = minc2_file(outputFilename)
+        v2 = minc2_file()
+        v2.create(outputFilename)
+        v.close()
         v2.close()
     def testHyperslabArray(self):
         """hyperslab should be reinsertable into volume"""
         v = minc2_file(inputFile_ushort)
-        v2 = minc2_file(outputFilename)
-        
+        v2 = minc2_file()
+        v2.create(outputFilename)
+        v2.close()
+        v.close()
 class testVectorFiles(unittest.TestCase):
     """test reading and writing of vector files"""
     def testVectorRead(self):
         """make sure that a vector file can be read correctly"""
         v = minc2_file(inputVector)
-        dims = v.store_dims()
-        v.close()
+        v.setup_standard_order()
+        dims = v.representation_dims()
         self.assertEqual(dims[0].id, minc2_file.MINC2_DIM_VEC)
+        v.close()
     def testVectorRead2(self):
         """make sure that volume has four dimensions"""
         v = minc2_file(inputVector)
