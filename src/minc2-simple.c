@@ -231,24 +231,29 @@ int minc2_open(minc2_file_handle h, const char * path)
     }
 
     h->dimension_name[i] = name;
-    
     h->store_dims[h->ndims-i-1].length=h->dimension_size[i];
     
+    /*TODO:Do not read this information for vector_dimension!*/
     if(miget_dimension_separation(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].step)<0) {
-      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension step");
-      return MINC2_ERROR;
+      /*MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension step");
+      return MINC2_ERROR;*/
+      h->store_dims[h->ndims-i-1].step=0.0; /*set default value of 0, if there is no step size*/
     }
     
+    /*TODO:Do not read this information for vector_dimension!*/
     if(miget_dimension_cosines(h->file_dims[i],&h->store_dims[h->ndims-i-1].dir_cos[0])==MI_NOERROR)
       h->store_dims[h->ndims-i-1].have_dir_cos=1;
     else
       h->store_dims[h->ndims-i-1].have_dir_cos=0;
     
+    /*TODO:Do not read this information for vector_dimension!*/
     if(miget_dimension_start(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].start)<0)
     {
-      MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension start");
-      return MINC2_ERROR;
+      /*MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension start");
+      return MINC2_ERROR;*/
+      h->store_dims[h->ndims-i-1].start=0.0; /*set default value of 0, if there is no step size*/
     }
+
     if(miget_dimension_sampling_flag(h->file_dims[i],&_sampling)<0)
     {
       MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension sampling");

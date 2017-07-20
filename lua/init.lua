@@ -854,8 +854,9 @@ function minc2_file:save_hyperslab(buf, start)
     end
 end
 
+
 function minc2_file:read_attribute(group,attribute)
-    
+
     local attr_type=ffi.new("int[1]")
     local attr_length=ffi.new("int[1]")
     

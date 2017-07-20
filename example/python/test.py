@@ -14,7 +14,7 @@ if __name__ == "__main__":
     dims=m.store_dims()
 
     for i in range(m.ndim()): 
-        print('Dimension {} length:{} id:{} start:{} step:{}'.format(i,dims[i].length,dims[i].id,dims[i].start,dims[i].step))
+        print('Dimension {} length:{} id:{} start:{} step:{}'.format(i,dims[i].length, dims[i].id, dims[i].start, dims[i].step))
 
     o=minc2_file()
     # will create file with same dimensions
