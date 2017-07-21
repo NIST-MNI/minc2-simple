@@ -81,6 +81,7 @@ def tearDownModule():
         os.remove(outputFilename)
     if os.path.exists(newFilename):
         os.remove(newFilename)
+    
     os.remove(outputXfmFilename1)
     os.remove(outputXfmFilename2)
     os.remove(outputXfmFilename3)
@@ -226,32 +227,82 @@ class TestHyperslabs(unittest.TestCase):
     """test getting and setting of hyperslabs"""
     def testGetHyperslab(self):
         """hyperslab should be same as slice from data array"""
-        v = minc2_file(inputFile_ushort)
-        sliceFromData = v.data[10,:,:]
+        
+        inputFile=inputFile_ushort
+        #inputFile='/export01/data/vfonov/src1/minc2-simple/python/test_icbm.mnc'
+        
+        v = minc2_file(inputFile)
+        v.setup_standard_order()
+        sliceFromData_x = v.data[10,:,:]
+        sliceFromData_y = v.data[:,10,:]
+        sliceFromData_z = v.data[:,:,10]
         v.close()
         
-        b = minc2_file(inputFile_ushort)
+        b = minc2_file(inputFile)
         b.setup_standard_order()
-        hyperslab = b.load_hyperslab( [10, None, None] )
+        hyperslab_x = b.load_hyperslab( [10, None, None] ).squeeze()
+        hyperslab_y = b.load_hyperslab( [None, 10, None] ).squeeze()
+        hyperslab_z = b.load_hyperslab( [None, None, 10] ).squeeze()
         b.close()
+
+        self.assertEqual(N.average((sliceFromData_x-hyperslab_x)**2),0.0)
+        self.assertEqual(N.average((sliceFromData_y-hyperslab_y)**2),0.0)
+        self.assertEqual(N.average((sliceFromData_z-hyperslab_z)**2),0.0)
         
-        sa = N.average(sliceFromData)
-        ha = N.average(hyperslab)
-        self.assertEqual(sa, ha)
-    def testSetHyperslab(self):
-        """setting hyperslab should change underlying volume"""
-        v = minc2_file(inputFile_ushort)
+    def testSetHyperslabFloat(self):
+        """setting hyperslab should change underlying volume (float)"""
+        
+        # read some data from somwhere
+        v  = minc2_file(inputFile_ushort)
+        dims=v.store_dims()
+        v.setup_standard_order()
+        hyperslab_a = v.load_hyperslab( [10, None, None] )
+        
         v2 = minc2_file()
+        v2.define(dims,'float32','float32')
         v2.create(outputFilename)
-        v.close()
+        v2.setup_standard_order()
+        
+        # because we are saving float32 , we don't need slice normalization
+        v2.save_hyperslab(hyperslab_a,   [10,None,None] )
+        hyperslab_b = v2.load_hyperslab( [10, None, None] )
+        self.assertEqual(N.average((hyperslab_a-hyperslab_b)**2),0.0)
         v2.close()
+        v.close()
+
+    def testSetHyperslabShort(self):
+        """setting hyperslab should change underlying volume (short)"""
+        
+        # read some data from somwhere
+        v  = minc2_file(inputFile_ushort)
+        dims=v.store_dims()
+        v.setup_standard_order()
+        hyperslab_a = v.load_hyperslab( [10, None, None] )
+        
+        # try with normalization
+        v2 = minc2_file()
+        v2.define(dims,'uint16','float32') # , global_scaling=True
+        v2.create(outputFilename)
+        v2.set_volume_range(N.min(hyperslab_a),N.max(hyperslab_a))
+        v2.setup_standard_order()
+        
+        # have to set slice normalization
+        v2.save_hyperslab(hyperslab_a,   [10,None,None] )
+        hyperslab_b = v2.load_hyperslab( [10, None, None] )
+        self.assertAlmostEqual(N.average((hyperslab_a-hyperslab_b)**2),0.0,8)
+        v2.close()
+        v.close()
+        
+        
     def testHyperslabArray(self):
         """hyperslab should be reinsertable into volume"""
-        v = minc2_file(inputFile_ushort)
-        v2 = minc2_file()
-        v2.create(outputFilename)
-        v2.close()
-        v.close()
+        if False:
+            v = minc2_file(inputFile_ushort)
+            v2 = minc2_file()
+            v2.create(outputFilename)
+            v2.close()
+            v.close()
+
 class testVectorFiles(unittest.TestCase):
     """test reading and writing of vector files"""
     def testVectorRead(self):
@@ -265,8 +316,10 @@ class testVectorFiles(unittest.TestCase):
         """make sure that volume has four dimensions"""
         v = minc2_file(inputVector)
         ndims = v.ndim()
-        v.close()
         self.assertEqual(ndims, 4)
+        data=v.data
+        self.assertEqual(len(data.shape),4)
+        v.close()
         
 class testDirectionCosines(unittest.TestCase):
     """test that pyminc deals correctly with direction cosines"""
@@ -292,6 +345,7 @@ class testDirectionCosines(unittest.TestCase):
         self.assertAlmostEqual(dims[2].dir_cos[0], 0.0, 8)
         self.assertAlmostEqual(dims[2].dir_cos[1], 0.0, 8)
         self.assertAlmostEqual(dims[2].dir_cos[2], 1.0, 8)
+        
     def testNonDefaultDirCos3DVFF(self):
         """testing reading the direction cosines of a file with non-standard values (volumeFromFile)"""
         v = minc2_file(input3DdirectionCosines)

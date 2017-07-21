@@ -102,7 +102,7 @@ class minc2_file(object):
             raise minc2_error()
         return dims[0]
     
-    def define(self, dims, store_type=None, representation_type=None):
+    def define(self, dims, store_type=None, representation_type=None, slice_scaling=None, global_scaling=None):
         _dims=dims
         if store_type is None:
             store_type=lib.MINC2_SHORT
@@ -113,12 +113,12 @@ class minc2_file(object):
         _representation_type=representation_type
 
         if isinstance(_store_type, six.string_types):
-            _store_type=__numpy_to_minc2[_store_type]
+            _store_type=minc2_file.__numpy_to_minc2[_store_type]
 
         if isinstance(_representation_type, six.string_types):
-            _representation_type=__numpy_to_minc2[_representation_type]
+            _representation_type=minc2_file.__numpy_to_minc2[_representation_type]
 
-        if isinstance(dims,list):
+        if isinstance(dims,list) or isinstance(dims,tuple):
             _dims = ffi.new("struct minc2_dimension[]", len(dims)+1)
             for i,j in enumerate(dims):
                 _dims[i]=j
@@ -126,7 +126,17 @@ class minc2_file(object):
 
         if lib.minc2_define(self._v, _dims, _store_type, _representation_type)!=lib.MINC2_SUCCESS:
             raise minc2_error()
-    
+
+        if slice_scaling is not None or global_scaling is not None:
+            _slice_scaling=0
+            _global_scaling=0
+
+            if slice_scaling: _slice_scaling=1
+            if global_scaling: _global_scaling=1
+
+            if lib.minc2_set_scaling(self._v,_global_scaling,_slice_scaling )!=lib.MINC2_SUCCESS:
+                raise minc2_error()
+
     def create(self, path):
         if lib.minc2_create(self._v, to_bytes(path) )!=lib.MINC2_SUCCESS:
             raise minc2_error()
@@ -304,9 +314,9 @@ class minc2_file(object):
         if start is None:
             return self.save_complete_volume(buf)
         else:
-            import numpy as np
-            data_type=lib.MINC2_FLOAT
-            store_type=buf.dtype.name
+            #import numpy as np
+            data_type  = lib.MINC2_FLOAT
+            store_type = buf.dtype.name
 
             ndims =self.ndim()
             dims = buf.shape
@@ -316,7 +326,7 @@ class minc2_file(object):
 
             for i in range(ndims):
                 if start[i] is not None:
-                    if isinstance(start[i],list):
+                    if isinstance(start[i], list) or isinstance(start[i], tuple):
                         if len(start[i])==2:
                             slab_count[ndims-1-i]=start[i][1]-start[i][0]
                             slab_start[ndims-1-i]=start[i][0]
@@ -332,8 +342,9 @@ class minc2_file(object):
 
             data_type=minc2_file.__numpy_to_minc2[store_type]
 
-            if lib.minc2_write_hyperslab(self._v, slab_start, slab_count,
-                                         ffi.cast("void *", buf.ctypes.data), data_type)!=lib.MINC2_SUCCESS:
+            if lib.minc2_write_hyperslab( self._v, slab_start, slab_count,
+                                          ffi.cast("void *", buf.ctypes.data),
+                                          data_type ) != lib.MINC2_SUCCESS:
                 raise minc2_error()
             return buf
 
@@ -354,7 +365,7 @@ class minc2_file(object):
 
             for i in range(ndims):
                 if slab[i] is not None:
-                    if isinstance(slab[i], list):
+                    if isinstance(slab[i], list) or isinstance(slab[i], tuple):
                         if len(slab[i]) == 2:
                             slab_count[ndims-1-i] = slab[i][1]-slab[i][0]
                             slab_start[ndims-1-i] = slab[i][0]
@@ -384,8 +395,9 @@ class minc2_file(object):
 
             buf = np.empty(dims, dtype, 'C')
 
-            if lib.minc2_read_hyperslab(self._v, slab_start, slab_count,
-                                        ffi.cast("void *", buf.ctypes.data), data_type) != lib.MINC2_SUCCESS:
+            if lib.minc2_read_hyperslab( self._v, slab_start, slab_count,
+                                         ffi.cast("void *", buf.ctypes.data),
+                                         data_type ) != lib.MINC2_SUCCESS:
                 raise minc2_error()
             return buf
 
