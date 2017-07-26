@@ -51,9 +51,9 @@ def xfmavg(inputs, output, verbose=False):
                 if scipy.linalg.norm(_identity-np.asmatrix(x.get_linear_transform(0)) )>_eps: # this is non-identity matrix
                     all_nonlinear&=False
                 else:
-                    input_grids.append(x.get_grid_transform(1))
+                    input_grids.append(x.get_grid_transform(1)[0])
             elif x.get_n_type(1)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
-                input_grids.append(x.get_grid_transform(0))
+                input_grids.append(x.get_grid_transform(0)[0])
                 
     if all_linear:
         acc=np.asmatrix(np.zeros([4,4],dtype=np.complex))

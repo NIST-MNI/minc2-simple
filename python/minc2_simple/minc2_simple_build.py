@@ -34,7 +34,11 @@ ffi.set_source("minc2_simple._simple",
 
 ffi.cdef(
     """
-
+/**
+ * standard memory management
+ */
+void *malloc(size_t size);
+void free(void *ptr);
 
 /**
   * minc2 dimension types
