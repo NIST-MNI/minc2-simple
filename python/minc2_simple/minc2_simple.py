@@ -457,13 +457,12 @@ class minc2_xfm(object):
         return t[0]
 
     def get_grid_transform(self,n=0):
-        warnings.warn("Grid transform is not tested")
         c_file=ffi.new("char**")
         inv=ffi.new("int*",0)
         assert(lib.minc2_xfm_get_grid_transform(self._v,n,inv,c_file)==lib.MINC2_SUCCESS)
         _file=ffi.string(c_file[0])
         ffi.free(c_file[0])
-        return (_file,inv[0])
+        return (_file,inv[0]!=0)
 
     def get_linear_transform(self,n=0):
         import numpy as np
