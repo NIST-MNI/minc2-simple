@@ -103,6 +103,25 @@ struct minc2_xfm_file;
 typedef struct minc2_xfm_file *minc2_xfm_file_handle;
 
 
+/**
+ * minc tag file info
+ */
+struct minc2_tags
+{
+  int         n_volumes;
+  int         n_tag_points;
+
+  double     *tags_volume1;
+  double     *tags_volume2;
+
+  double     *weights;
+  int        *structure_ids;
+  int        *patient_ids;
+
+  char **labels;
+};
+
+
 /** 
  * allocate empty minc2 file structure, no need to call minc2_init after
  */
@@ -488,6 +507,30 @@ int minc2_iterator_get_values(minc2_file_iterator_handle h,void *val);
 int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val);
 
 
+/**
+ * Tags io
+ */
+
+/**
+ * allocate tag structure (empty)
+ */
+struct minc2_tags * minc2_tags_allocate0(void);
+
+/**
+ * free all memory resources
+ * used in tags
+ */
+int minc2_tags_free(struct minc2_tags *tags);
+
+/**
+ * load tags from file
+ */
+int minc2_tags_load(const char *file,struct minc2_tags *tags);
+
+/**
+ * save tags to file
+ */
+int minc2_tags_save(const char *file,struct minc2_tags *tags);
 
 #ifdef __cplusplus
 }
