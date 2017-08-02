@@ -2090,7 +2090,7 @@ int minc2_tags_free(struct minc2_tags *tags)
 }
 
 
-void static _convert_array_from_VIO(double *dst, VIO_Real  **src, int n_tag_points)
+static void _convert_array_from_VIO(double *dst, VIO_Real  **src, int n_tag_points)
 {
   int i=0;
   for(i=0;i<n_tag_points;i++)
@@ -2101,7 +2101,7 @@ void static _convert_array_from_VIO(double *dst, VIO_Real  **src, int n_tag_poin
   }
 }
 
-void static _convert_array_to_VIO(double *src, VIO_Real  **dst, int n_tag_points)
+static void _convert_array_to_VIO(double *src, VIO_Real  **dst, int n_tag_points)
 {
   int i=0;
   for(i=0;i<n_tag_points;i++)
@@ -2112,7 +2112,19 @@ void static _convert_array_to_VIO(double *src, VIO_Real  **dst, int n_tag_points
   }
 }
 
-int static minc2_tags_convert_from_VIO(struct minc2_tags *tags,
+static VIO_Real ** _allocate_vio_vectors(int n,int m)
+{
+  VIO_Real ** vol=NULL;
+  int i;
+  SET_ARRAY_SIZE( vol, 0, n, 10 );
+  for(i=0;i<n;i++)
+  {
+    ALLOC( vol[i], m );
+  }
+  return vol;
+}
+
+static int minc2_tags_convert_from_VIO(struct minc2_tags *tags,
                     int n_volumes,
                     int n_tag_points,
                     VIO_Real  **tags_volume1,
@@ -2159,7 +2171,7 @@ int static minc2_tags_convert_from_VIO(struct minc2_tags *tags,
   return MINC2_SUCCESS;
 }
 
-int static minc2_tags_convert_to_VIO(struct minc2_tags *tags,
+static int minc2_tags_convert_to_VIO(struct minc2_tags *tags,
                     int *n_volumes,
                     int *n_tag_points,
                     VIO_Real  ***tags_volume1,
@@ -2174,18 +2186,23 @@ int static minc2_tags_convert_to_VIO(struct minc2_tags *tags,
   *n_volumes=tags->n_volumes;
   *n_tag_points=tags->n_tag_points;
 
-  tags->tags_volume1=malloc( tags->n_tag_points*3*sizeof(double) );
+  //tags->tags_volume1=malloc( tags->n_tag_points*3*sizeof(VIO_Real) );
+  *tags_volume1=_allocate_vio_vectors(tags->n_tag_points,3);
   _convert_array_to_VIO(tags->tags_volume1, *tags_volume1, tags->n_tag_points);
 
   if(tags->n_volumes>1 && tags->tags_volume2){
-    tags->tags_volume2=malloc(tags->n_tag_points*3*sizeof(double));
+    *tags_volume2=_allocate_vio_vectors(tags->n_tag_points,3);
     _convert_array_to_VIO(tags->tags_volume2, *tags_volume2, tags->n_tag_points);
+  } else {
+    *tags_volume2=NULL;
   }
 
   if(tags->weights) {
     int i;
-    *weights=malloc(tags->n_tag_points*sizeof(double));
-    for(i=0;i<n_tag_points;i++) (*weights)[i]=tags->weights[i];
+    *weights=malloc(tags->n_tag_points*sizeof(VIO_Real));
+    for(i=0;i<tags->n_tag_points;i++) (*weights)[i]=tags->weights[i];
+  } else {
+    *weights=NULL;
   }
 
   if(tags->structure_ids) {
@@ -2200,8 +2217,8 @@ int static minc2_tags_convert_to_VIO(struct minc2_tags *tags,
 
   if(tags->labels) {
     int i;
-    labels=malloc(tags->n_tag_points*sizeof(const char *));
-    for(i=0;i<tags->n_tag_points;i++) (*labels)[i]=strdup(tags->labels[i]);
+    *labels=malloc(tags->n_tag_points*sizeof(const char *));
+    for(i=0;i< tags->n_tag_points ;i++) (*labels)[i]=strdup(tags->labels[i]);
   }
 
   /*TODO: check if all memoru properly allocated*/
@@ -2221,7 +2238,7 @@ int minc2_tags_load(const char *file, struct minc2_tags *tags)
 
   int ret=MINC2_ERROR;
 
-  if ( input_tag_file(file, &n_volumes, &n_tag_points,
+  if ( input_tag_file((char *)file, &n_volumes, &n_tag_points,
        &tags_volume1, &tags_volume2, &weights, &structure_ids, &patient_ids, &labels ) != VIO_OK ) {
     return MINC2_ERROR;
   }
@@ -2244,11 +2261,18 @@ int minc2_tags_save(const char *file, struct minc2_tags *tags)
   VIO_Real      **tags_volume1;
   VIO_Real      **tags_volume2;
   VIO_Real      *weights;
-  int       *structure_ids;
-  int       *patient_ids;
-  VIO_STR   *labels;
+  int         *structure_ids;
+  int         *patient_ids;
+  VIO_STR     *labels;
 
-  /*TODO: finish this*/
+  int ret=MINC2_ERROR;
+
+  ret=minc2_tags_convert_to_VIO(tags,&n_volumes,&n_tag_points,&tags_volume1,&tags_volume2,&weights,&structure_ids,&patient_ids,&labels);
+
+  if ( output_tag_file((char *)file, "minc2-simple tag output", n_volumes, n_tag_points,
+       tags_volume1, tags_volume2, weights, structure_ids, patient_ids, labels ) != VIO_OK ) {
+    ret=MINC2_ERROR;
+  }
 
   free_tag_points(
     n_volumes, n_tag_points,
@@ -2256,7 +2280,7 @@ int minc2_tags_save(const char *file, struct minc2_tags *tags)
     weights,structure_ids,
     patient_ids,labels );
 
-  return MINC2_ERROR;
+  return ret;
 }
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */
