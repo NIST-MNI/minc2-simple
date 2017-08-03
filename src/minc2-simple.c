@@ -2156,6 +2156,7 @@ static int minc2_tags_convert_from_VIO(struct minc2_tags *tags,
     tags->structure_ids=malloc(n_tag_points*sizeof(int));
     memmove(tags->structure_ids,structure_ids,sizeof(int)*n_tag_points);
   }
+
   if(patient_ids) {
     tags->patient_ids=calloc(n_tag_points,sizeof(int));
     memmove(tags->patient_ids,patient_ids,sizeof(int)*n_tag_points);
@@ -2212,7 +2213,7 @@ static int minc2_tags_convert_to_VIO(struct minc2_tags *tags,
 
   if(tags->patient_ids) {
     *patient_ids=malloc(tags->n_tag_points*sizeof(int));
-    memmove(patient_ids,tags->patient_ids,sizeof(int)*tags->n_tag_points);
+    memmove(*patient_ids,tags->patient_ids,sizeof(int)*tags->n_tag_points);
   }
 
   if(tags->labels) {
@@ -2256,18 +2257,18 @@ int minc2_tags_load(const char *file, struct minc2_tags *tags)
 
 int minc2_tags_save(const char *file, struct minc2_tags *tags)
 {
-  int       n_volumes;
-  int       n_tag_points;
-  VIO_Real      **tags_volume1;
-  VIO_Real      **tags_volume2;
-  VIO_Real      *weights;
+  int         n_volumes;
+  int         n_tag_points;
+  VIO_Real  **tags_volume1;
+  VIO_Real  **tags_volume2;
+  VIO_Real   *weights;
   int         *structure_ids;
   int         *patient_ids;
   VIO_STR     *labels;
 
   int ret=MINC2_ERROR;
 
-  ret=minc2_tags_convert_to_VIO(tags,&n_volumes,&n_tag_points,&tags_volume1,&tags_volume2,&weights,&structure_ids,&patient_ids,&labels);
+  ret=minc2_tags_convert_to_VIO(tags,&n_volumes, &n_tag_points, &tags_volume1, &tags_volume2,&weights,&structure_ids,&patient_ids,&labels);
 
   if ( output_tag_file((char *)file, "minc2-simple tag output", n_volumes, n_tag_points,
        tags_volume1, tags_volume2, weights, structure_ids, patient_ids, labels ) != VIO_OK ) {
