@@ -545,4 +545,5 @@ int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int ha
 #endif /* __cplusplus defined */
 
 #endif /*MINC2_SIMPLE_H*/
-/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c*/
+
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-spaces modified; hl c*/

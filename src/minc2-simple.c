@@ -2286,7 +2286,6 @@ int minc2_tags_save(const char *file, minc2_tags_handle tags)
   return ret;
 }
 
-
 int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int have_weights,int have_strucure_ids,int have_patient_ids,int have_labels)
 {
   tags->n_volumes=n_volumes;
@@ -2304,19 +2303,19 @@ int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int ha
   }
 
   if(have_strucure_ids) {
-    tags->structure_ids=malloc(n_tag_points*sizeof(int));
+    tags->structure_ids=calloc(n_tag_points,sizeof(int));
   }
 
   if(have_patient_ids) {
-    tags->patient_ids=malloc(n_tag_points*sizeof(int));
+    tags->patient_ids=calloc(n_tag_points,sizeof(int));
   }
 
   if(have_labels) {
-    tags->labels=malloc(n_tag_points*sizeof(const char *));
+    tags->labels=calloc(n_tag_points,sizeof(const char *));
   }
 
   /*TODO: check memory allocation!*/
   return MINC2_SUCCESS;
 }
 
-/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */
+/* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-spaces modified; hl c*/
