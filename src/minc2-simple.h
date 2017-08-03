@@ -121,6 +121,8 @@ struct minc2_tags
   char **labels;
 };
 
+typedef struct minc2_tags *minc2_tags_handle;
+
 
 /** 
  * allocate empty minc2 file structure, no need to call minc2_init after
@@ -514,23 +516,29 @@ int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val);
 /**
  * allocate tag structure (empty)
  */
-struct minc2_tags * minc2_tags_allocate0(void);
+minc2_tags_handle minc2_tags_allocate0(void);
 
 /**
  * free all memory resources
  * used in tags
  */
-int minc2_tags_free(struct minc2_tags *tags);
+int minc2_tags_free(minc2_tags_handle tags);
 
 /**
  * load tags from file
  */
-int minc2_tags_load(const char *file,struct minc2_tags *tags);
+int minc2_tags_load(const char *file,minc2_tags_handle tags);
 
 /**
  * save tags to file
  */
-int minc2_tags_save(const char *file,struct minc2_tags *tags);
+int minc2_tags_save(const char *file,minc2_tags_handle tags);
+
+/**
+ * initialize minc tags with fixed number of tags
+ */
+int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int have_weights,int have_strucure_ids,int have_patient_ids,int have_labels);
+
 
 #ifdef __cplusplus
 }

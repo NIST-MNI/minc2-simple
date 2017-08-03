@@ -2051,14 +2051,14 @@ int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val)
 /**
  * tag operations
  */
-struct minc2_tags * minc2_tags_allocate0(void)
+minc2_tags_handle  minc2_tags_allocate0(void)
 {
-  struct minc2_tags *m=calloc(1,sizeof(struct minc2_tags));
+  minc2_tags_handle m=calloc(1,sizeof(struct minc2_tags));
 
   return m;
 }
 
-int minc2_tags_free(struct minc2_tags *tags)
+int minc2_tags_free(minc2_tags_handle tags)
 {
   int i,n;
   if(!tags) return MINC2_ERROR;
@@ -2087,6 +2087,8 @@ int minc2_tags_free(struct minc2_tags *tags)
     }
     free(tags->labels);
   }
+  free(tags);
+  return MINC2_SUCCESS;
 }
 
 
@@ -2124,7 +2126,7 @@ static VIO_Real ** _allocate_vio_vectors(int n,int m)
   return vol;
 }
 
-static int minc2_tags_convert_from_VIO(struct minc2_tags *tags,
+static int minc2_tags_convert_from_VIO(minc2_tags_handle tags,
                     int n_volumes,
                     int n_tag_points,
                     VIO_Real  **tags_volume1,
@@ -2172,7 +2174,7 @@ static int minc2_tags_convert_from_VIO(struct minc2_tags *tags,
   return MINC2_SUCCESS;
 }
 
-static int minc2_tags_convert_to_VIO(struct minc2_tags *tags,
+static int minc2_tags_convert_to_VIO(minc2_tags_handle tags,
                     int *n_volumes,
                     int *n_tag_points,
                     VIO_Real  ***tags_volume1,
@@ -2226,7 +2228,7 @@ static int minc2_tags_convert_to_VIO(struct minc2_tags *tags,
   return MINC2_SUCCESS;
 }
 
-int minc2_tags_load(const char *file, struct minc2_tags *tags)
+int minc2_tags_load(const char *file, minc2_tags_handle tags)
 {
   int       n_volumes;
   int       n_tag_points;
@@ -2255,7 +2257,7 @@ int minc2_tags_load(const char *file, struct minc2_tags *tags)
   return ret;
 }
 
-int minc2_tags_save(const char *file, struct minc2_tags *tags)
+int minc2_tags_save(const char *file, minc2_tags_handle tags)
 {
   int         n_volumes;
   int         n_tag_points;
@@ -2282,6 +2284,39 @@ int minc2_tags_save(const char *file, struct minc2_tags *tags)
     patient_ids,labels );
 
   return ret;
+}
+
+
+int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int have_weights,int have_strucure_ids,int have_patient_ids,int have_labels)
+{
+  tags->n_volumes=n_volumes;
+  tags->n_tag_points=n_tag_points;
+
+  tags->tags_volume1=malloc(n_tag_points*3*sizeof(double));
+
+  /*TODO: check if the memory was already allocated!*/
+  if(n_volumes>1){
+    tags->tags_volume2=malloc(n_tag_points*3*sizeof(double));
+  }
+
+  if(have_weights) {
+    tags->weights=malloc(n_tag_points*sizeof(double));
+  }
+
+  if(have_strucure_ids) {
+    tags->structure_ids=malloc(n_tag_points*sizeof(int));
+  }
+
+  if(have_patient_ids) {
+    tags->patient_ids=malloc(n_tag_points*sizeof(int));
+  }
+
+  if(have_labels) {
+    tags->labels=malloc(n_tag_points*sizeof(const char *));
+  }
+
+  /*TODO: check memory allocation!*/
+  return MINC2_SUCCESS;
 }
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-space on; hl c */
