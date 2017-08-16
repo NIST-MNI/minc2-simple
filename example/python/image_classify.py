@@ -21,26 +21,29 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import tree
 from sklearn import naive_bayes
+from sklearn import mixture
 
 from sklearn.pipeline import Pipeline
 from sklearn import preprocessing
 
 
-def load_labels(infile):
+def load_labels( infile ):
     #with minc2_file(infile) as m:
     m=minc2_file(infile)
     m.setup_standard_order()
     data=m.load_complete_volume(minc2_file.MINC2_INT)
     return data
 
-def load_image(infile):
+
+def load_image( infile ):
     #with minc2_file(infile) as m:
     m=minc2_file(infile)
     m.setup_standard_order()
     data=m.load_complete_volume(minc2_file.MINC2_FLOAT)
     return data
 
-def save_labels(outfile,reference,data,history=None):
+
+def save_labels( outfile, reference, data, history=None ):
     # TODO: add history
     ref=minc2_file(reference)
     out=minc2_file()
@@ -67,12 +70,15 @@ def parse_options():
     
     parser.add_argument('--mask', 
                         help="Mask output results, set to 0 outside" )
-                    
+
+    parser.add_argument('--weights',
+                        help="Training weights" )
+
     parser.add_argument('--trainmask', 
                         help="Training mask" )
-    
+
     parser.add_argument('--method',
-                        choices=['SVM','lSVM','nuSVM','NN','RanForest','AdaBoost','tree','Logistic','Bayes'],
+                        choices=['SVM','lSVM','nuSVM','NN','RanForest','AdaBoost','tree','Logistic','Bayes','GM'],
                         default='lSVM',
                         help='Classification algorithm')
     
@@ -135,8 +141,14 @@ if __name__ == "__main__":
             images.append( ( c[2]-images[0].shape[2]/2.0)/ (images[0].shape[1]/2.0) )
 
         mask=None
+        weights=None
+
         if options.mask is not None:
             mask=load_labels(options.mask)
+
+        if options.weights is not None:
+            weights=load_image(options.weights)
+
         if options.debug: print("Done")
         
         clf=None
@@ -159,15 +171,21 @@ if __name__ == "__main__":
         
             if options.debug: print("Creating training dataset for classifier")
         
+            training_weights=None
+
             if options.trainmask is not None:
                 trainmask = load_labels(options.trainmask)
             
                 training_X = np.column_stack( tuple( np.ravel( j[ np.logical_and(prior>0 , trainmask>0 ) ] ) for j in images  ) )
                 training_Y = np.ravel( prior[ np.logical_and(prior>0 , trainmask>0 ) ] )
+                if weights is not None:
+                    training_weights = np.ravel( weights[ np.logical_and(prior>0 , trainmask>0 ) ] )
             else:
                 training_X = np.column_stack( tuple( np.ravel( j[ prior>0 ] ) for j in images  ) )
                 training_Y = np.ravel( prior[ prior>0 ] )
-        
+                if weights is not None:
+                    training_weights = np.ravel( weights[ prior>0 ] )
+
         
             if options.debug: print("Fitting...")
         
@@ -187,8 +205,10 @@ if __name__ == "__main__":
                 clf = linear_model.LogisticRegression(C=options.C)
             elif options.method=='Bayes':
                 clf = naive_bayes.GaussianNB()
+            elif options.method=='GM':
+                clf = mixture.BayesianGaussianMixture(n_components=len(labels))
             else:
-                clf = svm.LinearSVC()
+                clf = svm.LinearSVC(C=options.C)
             
             if options.preprocess is not None:
                 pp=None
@@ -198,9 +218,19 @@ if __name__ == "__main__":
                     pp = preprocessing.Normalizer()
                 else : # MinMax
                     pp = preprocessing.MinMaxScaler()
-                clf=Pipeline([('options.preprocess',pp),(options.method,clf)])
-            
-            clf.fit(training_X,training_Y)
+
+                clf=Pipeline([('preprocess',pp),
+                              ('clf',clf)])
+
+                if training_weights is not None:
+                    clf.fit(training_X, training_Y, clf__sample_weight=training_weights)
+                else:
+                    clf.fit(training_X, training_Y)
+            else:
+                if training_weights is not None:
+                    clf.fit(training_X, training_Y, sample_weight=training_weights)
+                else:
+                    clf.fit(training_X, training_Y)
         
         if options.debug: print(clf)
         
@@ -215,7 +245,7 @@ if __name__ == "__main__":
         
             if mask is not None:
                 if options.debug: print("Using mask")
-                out_cls=np.empty_like(images[0], dtype=np.int32 )
+                out_cls=np.zeros_like(images[0], dtype=np.int32 )
                 out_cls[mask>0]=clf.predict( np.column_stack( tuple( np.ravel( j[ mask>0 ] ) for j in images  ) ) )
             else:
                 out_cls=clf.predict( np.column_stack( tuple( np.ravel( j ) for j in images  ) ) )
@@ -224,6 +254,9 @@ if __name__ == "__main__":
             
             #out=minc.Label(data=out_cls)
             #out.save(name=options.output, imitate=options.image[0],history=history)
-            save_labels(options.output,options.image[0],out_cls,history=history)
+            save_labels(options.output, options.image[0], out_cls, history=history)
     else:
         print "Error in arguments"
+
+
+# kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl python; show-tabs on
