@@ -1,7 +1,10 @@
+from __future__ import print_function
+
 from ._simple import ffi,lib
 from .utils   import to_bytes
 from .utils   import text_type
 import six
+import sys
 
 class minc2_error(Exception):
     pass
@@ -193,25 +196,31 @@ class minc2_file(object):
             raise minc2_error()
         return buf
 
-    def read_attribute(self,group,attribute):
+    def read_attribute(self, group, attribute):
         import numpy as np
 
         attr_type=ffi.new("int*",0)
         attr_length=ffi.new("int*",0)
 
-        group=to_bytes(group)
-        attribute=to_bytes(attribute)
+        if isinstance(group, six.string_types ):
+            group=to_bytes(group)
+        if isinstance(attribute, six.string_types ):
+            attribute=to_bytes(attribute)
+
         # assume that if we can't get attribute type, it's missing, return nil
 
-        if lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)!=lib.MINC2_SUCCESS:
+        if lib.minc2_get_attribute_type(self._v, group, attribute, attr_type)!=lib.MINC2_SUCCESS:
+            print("Error getting attribute type {}:{}".format(group,attribute),file=sys.stderr)
             return None
 
-        if lib.minc2_get_attribute_length(self._v,group,attribute,attr_length)!=lib.MINC2_SUCCESS:
+        if lib.minc2_get_attribute_length(self._v, group, attribute, attr_length)!=lib.MINC2_SUCCESS:
+            print("Error getting attribute length {}:{}".format(group,attribute),file=sys.stderr)
             raise minc2_error()
 
         if attr_type[0] == lib.MINC2_STRING:
             buf = ffi.new("char[]", attr_length[0])
             if lib.minc2_read_attribute(self._v,group,attribute,buf,attr_length[0])!=lib.MINC2_SUCCESS:
+                print("Error reading string attribute {}:{}".format(group,attribute),file=sys.stderr)
                 raise minc2_error()
             return ffi.string(buf, attr_length[0])
         else:
@@ -222,32 +231,37 @@ class minc2_file(object):
                 shape=[attr_length[0]]
                 buf=np.empty(shape,dtype,'C')
             else:
+                print("Error determining attribute type {}:{}".format(group,attribute),file=sys.stderr)
                 raise minc2_error()
 
             if lib.minc2_read_attribute(self._v,group,attribute,ffi.cast("void *", buf.ctypes.data),attr_length[0])!=lib.MINC2_SUCCESS:
+                print("Error reading attribute {}:{}".format(group,attribute),file=sys.stderr)
                 raise minc2_error()
 
             return buf
 
-    def write_attribute(self,group,attribute,value):
-        group=to_bytes(group)
-        attribute=to_bytes(attribute)
+    def write_attribute(self, group, attribute, value):
+        if isinstance(group, six.string_types ):
+            group=to_bytes(group)
+        if isinstance(attribute, six.string_types ):
+            attribute=to_bytes(attribute)
 
-        if isinstance(value, text_type):
+        if isinstance(value, six.string_types ):
+            value=to_bytes(value)
             attr_type=lib.MINC2_STRING
             attr_length=len(value)
 
-            if lib.minc2_write_attribute(self._v,group,attribute,ffi.cast("const char[]",to_bytes(value)),attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
+            if lib.minc2_write_attribute(self._v,group, attribute, value, attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
                 raise minc2_error()
         else:
             import numpy as np
             data_type=lib.MINC2_FLOAT
-            store_type=buf.dtype.name
+            store_type=value.dtype.name
 
             assert(store_type in minc2_file.__numpy_to_minc2)
             data_type=minc2_file.__numpy_to_minc2[store_type]
 
-            if lib.minc2_write_attribute(self._v,group,attribute,ffi.cast("void *", buf.ctypes.data),buf.size,data_type)!=lib.MINC2_SUCCESS:
+            if lib.minc2_write_attribute(self._v, group, attribute, ffi.cast("void *", value.ctypes.data), value.size, data_type)!=lib.MINC2_SUCCESS:
                 raise minc2_error()
 
     def metadata(self):
@@ -267,7 +281,7 @@ class minc2_file(object):
 
             while lib.minc2_iterator_attribute_next(attr_iterator)==lib.MINC2_SUCCESS:
                 aname=lib.minc2_iterator_attribute_name(attr_iterator)
-                g[ ffi.string(aname) ] = self.read_attribute(gname, aname)
+                g[ ffi.string(aname) ] = self.read_attribute(ffi.string(gname), ffi.string(aname))
 
             ret[ ffi.string(lib.minc2_iterator_group_name(group_iterator)) ] = g
             lib.minc2_stop_info_iterator(attr_iterator)
