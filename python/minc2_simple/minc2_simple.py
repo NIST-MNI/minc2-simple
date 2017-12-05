@@ -433,12 +433,12 @@ class minc2_xfm(object):
 
     def open(self,path):
         assert path is not None,"Provide minc2 file"
-        assert lib.minc2_xfm_open(self._v,path) == lib.MINC2_SUCCESS
+        assert lib.minc2_xfm_open(self._v,to_bytes(path)) == lib.MINC2_SUCCESS
 
 
     def save(self,path):
         assert path is not None,"Provide minc2 file"
-        assert(lib.minc2_xfm_save(self._v,path) == lib.MINC2_SUCCESS)
+        assert(lib.minc2_xfm_save(self._v,to_bytes(path)) == lib.MINC2_SUCCESS)
 
 
     def transform_point(self,xyz_in):
@@ -527,7 +527,7 @@ class minc2_xfm(object):
         return self
 
     def append_grid_transform(self,grid_file,inv=False):
-        assert(lib.minc2_xfm_append_grid_transform(self._v,grid_file,inv)==lib.MINC2_SUCCESS)
+        assert(lib.minc2_xfm_append_grid_transform(self._v,to_bytes(grid_file),inv)==lib.MINC2_SUCCESS)
         return self
 
     def concat_xfm(self,another):

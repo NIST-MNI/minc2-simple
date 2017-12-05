@@ -855,14 +855,14 @@ function minc2_file:save_hyperslab(buf, start)
 end
 
 
-function minc2_file:read_attribute(group,attribute)
+function minc2_file:read_attribute(group, attribute)
 
     local attr_type=ffi.new("int[1]")
     local attr_length=ffi.new("int[1]")
     
     -- assume that if we can't get attribute type, it's missing, return nil
 
-    if lib.minc2_get_attribute_type(self._v,group,attribute,attr_type)~=ffi.C.MINC2_SUCCESS then
+    if lib.minc2_get_attribute_type(self._v,group, attribute, attr_type)~=ffi.C.MINC2_SUCCESS then
         return nil
     end
 
