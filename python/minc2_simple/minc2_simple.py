@@ -72,8 +72,19 @@ class minc2_file(object):
             lib.MINC2_FLOAT :  'float32',
             lib.MINC2_DOUBLE : 'float64',
         }
-
     __numpy_to_minc2 = {y:x for x,y in six.iteritems(__minc2_to_numpy)}
+
+    __minc2_to_torch={
+            lib.MINC2_BYTE :   'torch.CharTensor',
+            lib.MINC2_UBYTE :  'torch.ByteTensor',
+            lib.MINC2_SHORT :  'torch.ShortTensor',
+            lib.MINC2_USHORT : 'torch.ShortTensor', # WARNING: no support for unsigned short
+            lib.MINC2_INT :    'torch.IntTensor',
+            lib.MINC2_UINT :   'torch.IntTensor', # WARNING: no support for unsigned int
+            lib.MINC2_FLOAT :  'torch.FloatTensor',
+            lib.MINC2_DOUBLE : 'torch.DoubleTensor'
+        }
+    __torch_to_minc2 = {y:x for x,y in six.iteritems(__minc2_to_torch)}
     
     def __init__(self, path=None):
         self._v=ffi.gc(lib.minc2_allocate0(),lib.minc2_destroy)
@@ -177,6 +188,34 @@ class minc2_file(object):
             raise minc2_error()
         return buf
 
+    def load_complete_volume_tensor(self, data_type=None):
+        import torch
+        if data_type is None:
+            data_type=self.representation_dtype_tensor()
+        buf=None
+        _dims=self.representation_dims()
+        # dims=torch.LongStorage(self:ndim())
+        shape=list(range(self.ndim()))
+        # numpy array  defines dimensions in a slowest first fashion
+        for i in range(self.ndim()):
+            shape[self.ndim()-i-1]=_dims[i].length
+
+        dtype=None
+
+        if data_type in minc2_file.__minc2_to_torch:
+            dtype=eval(minc2_file.__minc2_to_torch[data_type])
+        elif data_type in minc2_file.__torch_to_minc2:
+            dtype=eval(data_type)
+            data_type=minc2_file.__torch_to_minc2[data_type]
+        else:
+            raise minc2_error()
+
+        buf=dtype(*shape)
+
+        if lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.storage().data_ptr()) , data_type)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+        return buf
+
     def setup_standard_order(self):
         if lib.minc2_setup_standard_order(self._v)!=lib.MINC2_SUCCESS:
             raise minc2_error()
@@ -193,6 +232,20 @@ class minc2_file(object):
         data_type=minc2_file.__numpy_to_minc2[store_type]
         
         if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.ctypes.data),data_type)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+        return buf
+
+    def save_complete_volume_tensor(self, buf):
+        import torch
+        data_type=lib.MINC2_FLOAT
+        store_type=buf.type()
+
+        assert(store_type in minc2_file.__torch_to_minc2)
+        # TODO: verify dimensions of the array
+
+        data_type=minc2_file.store_type[store_type]
+
+        if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.storage().data_ptr()),data_type)!=lib.MINC2_SUCCESS:
             raise minc2_error()
         return buf
 
@@ -306,18 +359,37 @@ class minc2_file(object):
             raise minc2_error()
         return minc2_file.__minc2_to_numpy[_dtype[0]]
 
+    def representation_dtype_tensor(self):
+        _dtype=ffi.new("int*",0)
+        if lib.minc2_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
+            raise minc2_error()
+        return minc2_file.__minc2_to_torch[_dtype[0]]
+
     # shortcut to setup_standard_order;load_complete_volume
     def get_data(self):
         self.setup_standard_order()
         return self.load_complete_volume()
+
+    # shortcut to setup_standard_order;load_complete_volume_tensor
+    def get_tensor(self):
+        self.setup_standard_order()
+        return self.load_complete_volume_tensor()
 
     # shortcut to setup_standard_order,save_complete_volume
     def set_data(self,new_data):
         self.setup_standard_order()
         self.save_complete_volume(new_data)
 
+    # shortcut to setup_standard_order,save_complete_volume_tensor
+    def set_tensor(self,new_data):
+        self.setup_standard_order()
+        self.save_complete_volume_tensor(new_data)
+
     # get/set whole volume
     data = property(get_data,set_data,None,"Complete volume")
+
+    # get/set whole volume
+    tensor = property(get_tensor,set_tensor,None,"Complete volume")
 
     # hyperslab-based functions
     def set_volume_range(self, rmin, rmax):
@@ -378,7 +450,7 @@ class minc2_file(object):
             slab_count = ffi.new("int[]",ndims)
 
             for i in range(ndims):
-                if slab[i] is not None:
+                if len(slab)>i and slab[i] is not None:
                     if isinstance(slab[i], list) or isinstance(slab[i], tuple):
                         if len(slab[i]) == 2:
                             slab_count[ndims-1-i] = slab[i][1]-slab[i][0]

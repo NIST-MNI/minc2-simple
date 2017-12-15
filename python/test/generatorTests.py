@@ -87,7 +87,7 @@ def tearDownModule():
     os.remove(outputXfmFilename3)
 
 class TestFromFile(unittest.TestCase):
-    """test the volumeFromFile generator"""
+    """test the minc2_file reading using numpy"""
     def testFromFileError(self):
         """attempting to load a garbage file should raise exception"""
         self.assertRaises(minc2_error, minc2_file, "garbage.mnc")
@@ -185,6 +185,106 @@ class TestFromFile(unittest.TestCase):
         pipe.close()
         self.assertAlmostEqual(a, output, 8)
 
+try:
+    import torch # this is going to work only if torch is present
+    
+    class TestFromFileTensor(unittest.TestCase):
+        """test the minc2_file reading using pytorch tensor"""
+        def testFromFileDataTypeByte(self):
+            """ensure byte data is read as float by default"""
+            v = minc2_file(inputFile_byte)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.FloatTensor')
+        def testFromFileDataTypeShort(self):
+            """ensure short data is read as float by default"""
+            v = minc2_file(inputFile_short)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.FloatTensor')
+        def testFromFileDataTypeInt(self):
+            """ensure int data is read as float by default"""
+            v = minc2_file(inputFile_int)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.FloatTensor')
+        def testFromFileDataTypeFloat(self):
+            """ensure float data is read as float by default"""
+            v = minc2_file(inputFile_float)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.FloatTensor')
+        def testFromFileDataTypeDouble(self):
+            """ensure double data is read as float"""
+            v = minc2_file(inputFile_double)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.DoubleTensor')
+        def testFromFileDataTypeUByte(self):
+            """ensure unsigned byte data is read as float by default"""
+            v = minc2_file(inputFile_ubyte)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.FloatTensor')
+        def testFromFileDataTypeUShort(self):
+            """ensure unsigned short data is read as float by default"""
+            v = minc2_file(inputFile_ushort)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.FloatTensor')
+        def testFromFileDataTypeUInt(self):
+            """ensure unsigned int data is read as float by default"""
+            v = minc2_file(inputFile_uint)
+            dt = v.representation_dtype_tensor()
+            v.close()
+            self.assertEqual(dt, 'torch.FloatTensor')
+        def testFromFileDataByte(self):
+            """ensure that byte data is read correct with a precision of 8 decimals on a call to aveage()"""
+            v = minc2_file(inputFile_byte)
+            a = v.load_complete_volume_tensor('torch.DoubleTensor').mean()
+            v.close()
+            pipe = os.popen("mincstats -mean -quiet %s" % inputFile_byte, "r")
+            output = float(pipe.read())
+            pipe.close()
+            self.assertAlmostEqual(a, output, 8)
+        def testFromFileDataShort(self):
+            """ensure that short data is read correct with a precision of 8 decimals on a call to aveage()"""
+            v = minc2_file(inputFile_short)
+            a = v.load_complete_volume_tensor('torch.DoubleTensor').mean()
+            v.close()
+            pipe = os.popen("mincstats -mean -quiet %s" % inputFile_short, "r")
+            output = float(pipe.read())
+            pipe.close()
+            self.assertAlmostEqual(a, output, 8)
+        def testFromFileDataInt(self):
+            """ensure that int data is read correct with a precision of 8 decimals on a call to aveage()"""
+            v = minc2_file(inputFile_int)
+            a = v.load_complete_volume_tensor('torch.DoubleTensor').mean()
+            v.close()
+            pipe = os.popen("mincstats -mean -quiet %s" % inputFile_int, "r")
+            output = float(pipe.read())
+            pipe.close()
+            self.assertAlmostEqual(a, output, 8)
+        def testFromFileDataFloat(self):
+            """ensure that float data is read correct with a precision of 8 decimals on a call to aveage()"""
+            v = minc2_file(inputFile_float)
+            a = v.load_complete_volume_tensor('torch.DoubleTensor').mean()
+            v.close()
+            pipe = os.popen("mincstats -mean -quiet %s" % inputFile_float, "r")
+            output = float(pipe.read())
+            pipe.close()
+            self.assertAlmostEqual(a, output, 8)
+        def testFromFileDataDouble(self):
+            """ensure that double data is read correct with a precision of 8 decimals on a call to aveage()"""
+            v = minc2_file(inputFile_double) 
+            a = v.tensor.mean()
+            v.close()
+            pipe = os.popen("mincstats -mean -quiet %s" % inputFile_double, "r")
+            output = float(pipe.read())
+            pipe.close()
+            self.assertAlmostEqual(a, output, 8)
+except:
+    pass
 
 class TestWriteFileDataTypes(unittest.TestCase):
     ############################################################################
