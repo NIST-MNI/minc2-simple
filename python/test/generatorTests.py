@@ -283,7 +283,7 @@ try:
             output = float(pipe.read())
             pipe.close()
             self.assertAlmostEqual(a, output, 8)
-except:
+except ImportError:
     pass
 
 class TestWriteFileDataTypes(unittest.TestCase):
@@ -402,6 +402,93 @@ class TestHyperslabs(unittest.TestCase):
             v2.create(outputFilename)
             v2.close()
             v.close()
+
+try: # run tests if torch is present
+    import torch
+    
+    class TestHyperslabsTensors(unittest.TestCase):
+        """test getting and setting of hyperslabs"""
+        def testGetHyperslab(self):
+            """hyperslab should be same as slice from data array"""
+            
+            inputFile=inputFile_ushort
+            #inputFile='/export01/data/vfonov/src1/minc2-simple/python/test_icbm.mnc'
+            
+            v = minc2_file(inputFile)
+            v.setup_standard_order()
+            sliceFromData_x = v.data[10,:,:]
+            sliceFromData_y = v.data[:,10,:]
+            sliceFromData_z = v.data[:,:,10]
+            v.close()
+            
+            b = minc2_file(inputFile)
+            b.setup_standard_order()
+            hyperslab_x = b.load_hyperslab_t( [10, None, None] ).squeeze()
+            hyperslab_y = b.load_hyperslab_t( [None, 10, None] ).squeeze()
+            hyperslab_z = b.load_hyperslab_t( [None, None, 10] ).squeeze()
+            b.close()
+
+            self.assertEqual(torch.mean((sliceFromData_x-hyperslab_x)**2),0.0)
+            self.assertEqual(torch.mean((sliceFromData_y-hyperslab_y)**2),0.0)
+            self.assertEqual(torch.mean((sliceFromData_z-hyperslab_z)**2),0.0)
+            
+        def testSetHyperslabFloat(self):
+            """setting hyperslab should change underlying volume (float)"""
+            
+            # read some data from somwhere
+            v  = minc2_file(inputFile_ushort)
+            dims=v.store_dims()
+            v.setup_standard_order()
+            hyperslab_a = v.load_hyperslab_t( [10, None, None] )
+            
+            v2 = minc2_file()
+            v2.define(dims,'float32','float32')
+            v2.create(outputFilename)
+            v2.setup_standard_order()
+            
+            # because we are saving float32 , we don't need slice normalization
+            v2.save_hyperslab_t(hyperslab_a,   [10,None,None] )
+            hyperslab_b = v2.load_hyperslab_t( [10, None, None] )
+            self.assertEqual(N.average((hyperslab_a-hyperslab_b)**2),0.0)
+            v2.close()
+            v.close()
+
+        def testSetHyperslabShort(self):
+            """setting hyperslab should change underlying volume (short)"""
+            
+            # read some data from somwhere
+            v  = minc2_file(inputFile_ushort)
+            dims=v.store_dims()
+            v.setup_standard_order()
+            hyperslab_a = v.load_hyperslab_t( [10, None, None] )
+            
+            # try with normalization
+            v2 = minc2_file()
+            v2.define(dims,'uint16','float32') # , global_scaling=True
+            v2.create(outputFilename)
+            v2.set_volume_range(torch.min(hyperslab_a),torch.max(hyperslab_a))
+            v2.setup_standard_order()
+            
+            # have to set slice normalization
+            v2.save_hyperslab_t(hyperslab_a,   [10,None,None] )
+            hyperslab_b = v2.load_hyperslab_t( [10, None, None] )
+            self.assertAlmostEqual(torch.mean((hyperslab_a-hyperslab_b)**2),0.0,8)
+            v2.close()
+            v.close()
+            
+            
+        def testHyperslabArray(self):
+            """hyperslab should be reinsertable into volume"""
+            if False:
+                v = minc2_file(inputFile_ushort)
+                v2 = minc2_file()
+                v2.create(outputFilename)
+                v2.close()
+                v.close()
+                
+except ImportError:
+    pass
+
 
 class testVectorFiles(unittest.TestCase):
     """test reading and writing of vector files"""

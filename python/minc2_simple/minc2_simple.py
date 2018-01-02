@@ -243,7 +243,7 @@ class minc2_file(object):
         assert(store_type in minc2_file.__torch_to_minc2)
         # TODO: verify dimensions of the array
 
-        data_type=minc2_file.store_type[store_type]
+        data_type=minc2_file.__torch_to_minc2[store_type]
 
         if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.storage().data_ptr()),data_type)!=lib.MINC2_SUCCESS:
             raise minc2_error()
@@ -434,6 +434,46 @@ class minc2_file(object):
                 raise minc2_error()
             return buf
 
+    def save_hyperslab_t(self, buf, start=None):
+        if start is None:
+            return self.save_complete_volume(buf)
+        else:
+            import torch
+            store_type=buf.type()
+            assert(store_type in minc2_file.__torch_to_minc2)
+            # TODO: verify dimensions of the array
+
+            #data_type = minc2_file.store_type[store_type]
+            data_type=minc2_file.__torch_to_minc2[store_type]
+
+            ndims =self.ndim()
+            dims = buf.size()
+
+            slab_start=ffi.new("int[]",ndims)
+            slab_count=ffi.new("int[]",ndims)
+
+            for i in range(ndims):
+                if start[i] is not None:
+                    if isinstance(start[i], list) or isinstance(start[i], tuple):
+                        if len(start[i])==2:
+                            slab_count[ndims-1-i]=start[i][1]-start[i][0]
+                            slab_start[ndims-1-i]=start[i][0]
+                        else: # assume it's the whole dimension
+                            slab_count[ndims-1-i]=dims[i]
+                            slab_start[ndims-1-i]=0
+                    else: #assume it's a number
+                        slab_count[ndims-1-i]=dims[i]
+                        slab_start[ndims-1-i]=start[i]
+                else:
+                    slab_count[ndims-1-i]=dims[i]
+                    slab_start[ndims-1-i]=0
+
+            if lib.minc2_write_hyperslab( self._v, slab_start, slab_count,
+                                          ffi.cast("void *", buf.storage().data_ptr()),
+                                          data_type ) != lib.MINC2_SUCCESS:
+                raise minc2_error()
+            return buf
+
     def load_hyperslab(self, slab=None, data_type=None):
         if data_type is None:
             data_type=self.representation_dtype()
@@ -483,6 +523,57 @@ class minc2_file(object):
 
             if lib.minc2_read_hyperslab( self._v, slab_start, slab_count,
                                          ffi.cast("void *", buf.ctypes.data),
+                                         data_type ) != lib.MINC2_SUCCESS:
+                raise minc2_error()
+            return buf
+
+    def load_hyperslab_t(self, slab=None, data_type=None):
+        if data_type is None:
+            data_type=self.representation_dtype_tensor()
+        if slab is None:
+            return self.load_complete_volume_tensor(data_type)
+        else:
+            import torch
+            buf = None
+            _dims = self.representation_dims()
+            ndims = self.ndim()
+            dims = [None]*ndims
+
+            slab_start = ffi.new("int[]",ndims)
+            slab_count = ffi.new("int[]",ndims)
+
+            for i in range(ndims):
+                if len(slab)>i and slab[i] is not None:
+                    if isinstance(slab[i], list) or isinstance(slab[i], tuple):
+                        if len(slab[i]) == 2:
+                            slab_count[ndims-1-i] = slab[i][1]-slab[i][0]
+                            slab_start[ndims-1-i] = slab[i][0]
+                        else:# -- assume it's the whole dimension
+                            slab_count[ndims-1-i] = _dims[ndims-i-1].length
+                            slab_start[ndims-1-i] = 0
+                    else: # assume it's a number
+                        slab_count[ndims-1-i] = 1
+                        slab_start[ndims-1-i] = slab[i]
+                else:
+                    slab_count[ndims-1-i] = _dims[ndims-i-1].length
+                    slab_start[ndims-1-i] = 0
+                dims[i] = slab_count[ndims-1-i]
+
+            dtype=None
+
+            if data_type in minc2_file.__minc2_to_torch:
+                dtype=eval(minc2_file.__minc2_to_torch[data_type])
+            elif data_type in minc2_file.__torch_to_minc2:
+                #print("evaluate:{}".format(data_type))
+                dtype=eval(data_type)
+                data_type=minc2_file.__torch_to_minc2[data_type]
+            else:
+                raise minc2_error()
+
+            buf=dtype(*dims)
+
+            if lib.minc2_read_hyperslab( self._v, slab_start, slab_count,
+                                         ffi.cast("void *", buf.storage().data_ptr()),
                                          data_type ) != lib.MINC2_SUCCESS:
                 raise minc2_error()
             return buf
