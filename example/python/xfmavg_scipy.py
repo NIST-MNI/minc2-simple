@@ -10,7 +10,7 @@ import numpy as np
 import scipy.linalg
 
 # needed to read and write XFM files
-from minc2.simple import minc2_xfm
+from minc2_simple import minc2_xfm
 
 
 def do_cmd(cmds,verbose=False):
