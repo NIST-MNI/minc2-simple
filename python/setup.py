@@ -26,8 +26,8 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     packages=find_packages(),
-    install_requires=["cffi>=1.0.0"],
-    setup_requires=["cffi>=1.0.0"],
+    install_requires=["cffi>=1.0.0","six"],
+    setup_requires=["cffi>=1.0.0","six"],
     cffi_modules=[
         "./minc2_simple/minc2_simple_build.py:ffi",
     ],
