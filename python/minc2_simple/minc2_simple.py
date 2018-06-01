@@ -578,6 +578,35 @@ class minc2_file(object):
                 raise minc2_error()
             return buf
 
+    def _slices_to_slab(self,args):
+        # assume it's either a number, or slice
+        args = args if isinstance(args, tuple) else (args,)
+        slab=[]
+        _dims = self.representation_dims()
+        if len(args)!=self.ndim():
+            # unsupported number of dimensions
+            raise minc2_error()
+
+        for i,a in enumerate(args):
+            if isinstance(a, slice):
+                if a.step is not None and a.step!=1:
+                    raise minc2_error()
+                slab+=[(a.start if a.start is not None else 0,
+                       a.stop  if a.stop is not None  else _dims[i].length )]
+            elif isinstance(a, int):
+                slab+=[a]
+            else:
+                raise minc2_error()
+        #print(args,slab)
+        return slab
+
+    def __getitem__(self,index):
+        return self.load_hyperslab(self._slices_to_slab(index)).squeeze()
+
+    def __setitem__(self,index,val):
+        return self.save_hyperslab(val,self._slices_to_slab(index))
+        
+
 
 class minc2_xfm(object):
     # constants
