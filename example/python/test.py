@@ -57,5 +57,26 @@ if __name__ == "__main__":
     o.close()
     # not strictly needed  either, the file will be close by garbage collection
     m.close()
+
+
+    # working with slices, numpy style
+    m=minc2_file(infile)
+    o=minc2_file()
+    o.define(m.store_dims(), minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)
+    o.create('test_out2.mnc')
+
+    m.setup_standard_order()
+    o.setup_standard_order()
+    d=m.representation_dims()
+
+    _slice=m[d[0].length//2,:,:]
+
+    o[0,:,:]=_slice
+    
+    o.close()
+    m.close()
+
+    
+
     
     
