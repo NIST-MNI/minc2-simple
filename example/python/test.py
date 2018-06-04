@@ -20,9 +20,9 @@ if __name__ == "__main__":
     # will create file with same dimensions
 
     my_dims=[
-        { 'id':minc2_file.MINC2_DIM_X,  'length':193,'start':96.0,   'step':-1.0},
-        { 'id':minc2_file.MINC2_DIM_Y,  'length':229,'start':-132.0, 'step':1.0},
-        { 'id':minc2_file.MINC2_DIM_Z,  'length':193,'start':-78.0,  'step':1.0}
+        { 'id':minc2_file.MINC2_DIM_X, 'length':193, 'start':96.0,   'step':-1.0},
+        { 'id':minc2_file.MINC2_DIM_Y, 'length':229, 'start':-132.0, 'step':1.0},
+        { 'id':minc2_file.MINC2_DIM_Z, 'length':193, 'start':-78.0,  'step':1.0}
     ]
     print("Will define new volume...")
     o.define(dims, minc2_file.MINC2_BYTE, minc2_file.MINC2_FLOAT)

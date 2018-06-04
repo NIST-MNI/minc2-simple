@@ -5,8 +5,11 @@ from .utils   import to_bytes
 from .utils   import text_type
 import six
 import sys
+import collections
 
 class minc2_error(Exception):
+    def __init__(self):
+        pass 
     pass
 
 class minc2_transform_parameters(object):
@@ -29,7 +32,9 @@ class minc2_transform_parameters(object):
     def __repr__(self):
         return self.__str__()
 
-class minc2_file(object):
+minc2_dim=collections.namedtuple('minc2_dim',['id','length', 'start', 'step', 'have_dir_cos', 'dir_cos'])
+
+class minc2_file:
 
     # constants
     MINC2_DIM_UNKNOWN=lib.MINC2_DIM_UNKNOWN
@@ -104,17 +109,33 @@ class minc2_file(object):
         lib.minc2_ndim(self._v,dd)
         return dd[0]
     
-    def store_dims(self):
+    def store_dims_(self):
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_store_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
             raise minc2_error()
         return dims[0]
-    
-    def representation_dims(self):
+
+    def minc2_dim_to_python_(self,d):
+        import numpy as np
+        dd=minc2_dim(id=d.id,length=d.length, start=d.start, step=d.step, have_dir_cos=d.have_dir_cos, dir_cos=np.zeros(3,np.float64))
+        if d.have_dir_cos:
+            ffi.memmove(ffi.cast("double [3]",dd.dir_cos.ctypes.data), d.dir_cos, 3*ffi.sizeof('double'))
+        return dd
+
+    def store_dims(self):
+        d_=self.store_dims_()
+        return [ self.minc2_dim_to_python_(d_[j]) for j in range(self.ndim())]
+   
+        
+    def representation_dims_(self):
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_representation_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
             raise minc2_error()
         return dims[0]
+
+    def representation_dims(self):
+        d_=self.representation_dims_()
+        return [ self.minc2_dim_to_python_(d_[j]) for j in range(self.ndim() ) ]
     
     def define(self, dims, store_type=None, representation_type=None, slice_scaling=None, global_scaling=None):
         _dims=dims
@@ -132,10 +153,19 @@ class minc2_file(object):
         if isinstance(_representation_type, six.string_types):
             _representation_type=minc2_file.__numpy_to_minc2[_representation_type]
 
-        if isinstance(dims,list) or isinstance(dims,tuple):
+        if isinstance(dims, list ) or isinstance(dims,tuple):
             _dims = ffi.new("struct minc2_dimension[]", len(dims)+1)
             for i,j in enumerate(dims):
-                _dims[i]=j
+                if isinstance(j,minc2_dim):
+                    _dims[i].id=j.id
+                    _dims[i].length=j.length
+                    _dims[i].start=j.start
+                    _dims[i].step=j.step
+                    _dims[i].have_dir_cos=j.have_dir_cos
+                    if j.have_dir_cos: 
+                        ffi.memmove(_dims[i].dir_cos, ffi.cast("double [3]", j.dir_cos.ctypes.data ), 3*ffi.sizeof('double'))
+                else:
+                    _dims[i]=j
             _dims[len(dims)]={'id':lib.MINC2_DIM_END}
 
         if lib.minc2_define(self._v, _dims, _store_type, _representation_type)!=lib.MINC2_SUCCESS:
@@ -397,6 +427,8 @@ class minc2_file(object):
             raise minc2_error()
 
     def save_hyperslab(self, buf, start=None):
+        """
+        """
         if start is None:
             return self.save_complete_volume(buf)
         else:
@@ -405,7 +437,10 @@ class minc2_file(object):
             store_type = buf.dtype.name
 
             ndims =self.ndim()
-            dims = buf.shape
+            _dims = self.representation_dims_()
+            #dims = buf.shape
+
+            # TODO: unsqueeze array
 
             slab_start=ffi.new("int[]",ndims)
             slab_count=ffi.new("int[]",ndims)
@@ -417,14 +452,18 @@ class minc2_file(object):
                             slab_count[ndims-1-i]=start[i][1]-start[i][0]
                             slab_start[ndims-1-i]=start[i][0]
                         else: # assume it's the whole dimension
-                            slab_count[ndims-1-i]=dims[i]
+                            slab_count[ndims-1-i]=_dims[ndims-i-1].length
                             slab_start[ndims-1-i]=0
                     else: #assume it's a number
-                        slab_count[ndims-1-i]=dims[i]
+                        slab_count[ndims-1-i]=_dims[ndims-i-1].length
                         slab_start[ndims-1-i]=start[i]
                 else:
-                    slab_count[ndims-1-i]=dims[i]
+                    slab_count[ndims-1-i]=_dims[ndims-i-1].length
                     slab_start[ndims-1-i]=0
+            
+            for i in range(ndims):
+                print("slab_count[{}]={}".format(i,slab_count[i]))
+                print("slab_start[{}]={}".format(i,slab_start[i]))
 
             data_type=minc2_file.__numpy_to_minc2[store_type]
 
@@ -482,7 +521,7 @@ class minc2_file(object):
         else:
             import numpy as np
             buf = None
-            _dims = self.representation_dims()
+            _dims = self.representation_dims_()
             ndims = self.ndim()
             dims = [None]*ndims
 
@@ -578,11 +617,13 @@ class minc2_file(object):
                 raise minc2_error()
             return buf
 
-    def _slices_to_slab(self,args):
+    def _slices_to_slab(self, args):
         # assume it's either a number, or slice
         args = args if isinstance(args, tuple) else (args,)
         slab=[]
         _dims = self.representation_dims()
+        ndims = self.ndim()
+
         if len(args)!=self.ndim():
             # unsupported number of dimensions
             raise minc2_error()
@@ -591,8 +632,8 @@ class minc2_file(object):
             if isinstance(a, slice):
                 if a.step is not None and a.step!=1:
                     raise minc2_error()
-                slab+=[(a.start if a.start is not None else 0,
-                       a.stop  if a.stop is not None  else _dims[i].length )]
+                slab+=[(a.start if a.start is not None  else 0,
+                        a.stop  if a.stop  is not None  else _dims[ndims-i-1].length )]
             elif isinstance(a, int):
                 slab+=[a]
             else:
@@ -600,15 +641,18 @@ class minc2_file(object):
         #print(args,slab)
         return slab
 
-    def __getitem__(self,index):
-        return self.load_hyperslab(self._slices_to_slab(index)).squeeze()
+    def __getitem__(self,s):
+        idx=self._slices_to_slab(s)
+        print("getitem {} - {}".format(repr(s),repr(idx)))
+        return self.load_hyperslab(idx).squeeze()
 
-    def __setitem__(self,index,val):
-        return self.save_hyperslab(val,self._slices_to_slab(index))
+    def __setitem__(self, s, val):
+        idx=self._slices_to_slab(s)
+        print("setitem {} - {}".format(repr(s),repr(idx)))
+        return self.save_hyperslab(val,idx)
         
 
-
-class minc2_xfm(object):
+class minc2_xfm:
     # constants
     MINC2_XFM_LINEAR                 = lib.MINC2_XFM_LINEAR
     MINC2_XFM_THIN_PLATE_SPLINE      = lib.MINC2_XFM_THIN_PLATE_SPLINE
