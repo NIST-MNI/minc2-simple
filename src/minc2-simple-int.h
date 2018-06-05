@@ -110,7 +110,7 @@ struct minc2_tags
   int        *structure_ids;
   int        *patient_ids;
 
-  char **labels;
+  char      **labels;
 };
 
 typedef struct minc2_tags *minc2_tags_handle;
@@ -519,18 +519,20 @@ int minc2_tags_free(minc2_tags_handle tags);
 /**
  * load tags from file
  */
-int minc2_tags_load(const char *file,minc2_tags_handle tags);
+int minc2_tags_load(minc2_tags_handle tags,const char *file);
 
 /**
  * save tags to file
  */
-int minc2_tags_save(const char *file,minc2_tags_handle tags);
+int minc2_tags_save(minc2_tags_handle tags,const char *file);
 
 /**
  * initialize minc tags with fixed number of tags
  */
 int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int have_weights,int have_strucure_ids,int have_patient_ids,int have_labels);
 
-
+/**
+ *
+ * /
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-spaces modified; hl c*/

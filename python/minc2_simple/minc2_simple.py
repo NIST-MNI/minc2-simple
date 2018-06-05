@@ -10,7 +10,7 @@ import collections
 class minc2_error(Exception):
     def __init__(self,message=""):
         super(minc2_error, self).__init__(message)
-    pass
+    
 
 class minc2_transform_parameters(object):
     def __init__(self):
@@ -35,8 +35,13 @@ class minc2_transform_parameters(object):
 minc2_dim=collections.namedtuple('minc2_dim',['id','length', 'start', 'step', 'have_dir_cos', 'dir_cos'])
 
 class minc2_file:
+    """
+    MINC2 file object (Volume)
+    Args:
+        path - path to minc file to open, (default None)
 
-    # constants
+    """
+    #: constants
     MINC2_DIM_UNKNOWN=lib.MINC2_DIM_UNKNOWN
     MINC2_DIM_X    = lib.MINC2_DIM_X
     MINC2_DIM_Y    = lib.MINC2_DIM_Y
@@ -45,7 +50,7 @@ class minc2_file:
     MINC2_DIM_VEC  = lib.MINC2_DIM_VEC
     MINC2_DIM_END  = lib.MINC2_DIM_END
     
-    # minc2 data types
+    #: minc2 data types
     MINC2_BYTE     = lib.MINC2_BYTE 
     MINC2_SHORT    = lib.MINC2_SHORT
     MINC2_INT      = lib.MINC2_INT 
@@ -642,6 +647,10 @@ class minc2_file:
         return self.save_hyperslab(val,idx)
 
 class minc2_xfm:
+    """
+    MINC2 .xfm file object
+    
+    """
     # constants
     MINC2_XFM_LINEAR                 = lib.MINC2_XFM_LINEAR
     MINC2_XFM_THIN_PLATE_SPLINE      = lib.MINC2_XFM_THIN_PLATE_SPLINE
@@ -650,23 +659,23 @@ class minc2_xfm:
     MINC2_XFM_GRID_TRANSFORM         = lib.MINC2_XFM_GRID_TRANSFORM
 
 
-    def __init__(self,path=None):
+    def __init__(self, path=None):
         self._v=ffi.gc(lib.minc2_xfm_allocate0(),lib.minc2_xfm_destroy)
         if path is not None:
             self.open(path)
 
 
-    def open(self,path):
+    def open(self, path):
         assert path is not None,"Provide minc2 file"
         assert lib.minc2_xfm_open(self._v,to_bytes(path)) == lib.MINC2_SUCCESS
 
 
-    def save(self,path):
+    def save(self, path):
         assert path is not None,"Provide minc2 file"
         assert(lib.minc2_xfm_save(self._v,to_bytes(path)) == lib.MINC2_SUCCESS)
 
 
-    def transform_point(self,xyz_in):
+    def transform_point(self, xyz_in):
         import numpy as np
         _xyz_in=np.asarray(xyz_in,'float64','C')
         xyz_out=np.empty([3],'float64','C')
@@ -757,5 +766,71 @@ class minc2_xfm:
 
     def concat_xfm(self,another):
         assert(lib.minc2_xfm_concat_xfm(self._v,another._v)==lib.MINC2_SUCCESS)
+
+
+class minc2_tags:
+    """
+    MINC2 tag object
+    """
+    def __init__(self, path=None,n_volumes=1):
+        import numpy as np
+        self.n_volumes=n_volumes
+        self.tag=[]
+        self.weights=None
+        self.structure_ids=None
+        self.patient_ids=None
+        self.labels=None
+
+        if path is not None:
+            self.open(path)
+
+    def __len__(self):
+        if self.tag[0] is not None:
+            return self.tag[0].shape[0]
+        else:
+            return 0
+
+    def open(self, path):
+        """
+        load tags from a file
+        """
+        assert path is not None,"Provide minc2 file"
+        _t=ffi.gc(lib.minc2_tags_allocate0(),lib.minc2_tags_free)
+        assert(lib.minc2_tags_load(_t,to_bytes(path))==lib.MINC2_SUCCESS)
+        import numpy as np
+        # convert internal data structure to numpy arrays
+        self.n_volumes=_t.n_volumes
+        self.tag=[]
+
+        self.tag+=[np.empty((_t.n_tag_points,3),'float64','C')]
+        ffi.memmove(ffi.cast("double *",self.tag[0].ctypes.data), _t.tags_volume1, _t.n_tag_points*3*ffi.sizeof('double'))
+        if self.n_volumes>1:
+            self.tag+=[np.empty((_t.n_tag_points,3),'float64','C')]
+            ffi.memmove( ffi.cast("double *",self.tag[1].ctypes.data), _t.tags_volume2, _t.n_tag_points*3*ffi.sizeof('double'))
+        #
+        if _t.weights is not None:
+            self.weights=np.empty(_t.n_tag_points,'float64','C')
+            ffi.memmove( ffi.cast("double *",self.weights.ctypes.data), _t.weights, _t.n_tag_points*ffi.sizeof('double'))
+        else:
+            self.weights=None
+            
+        if _t.structure_ids is not None:
+            self.structure_ids=np.zeros(_t.n_tag_points, np.int_,'C')
+            self.structure_ids[:]=np.frombuffer(ffi.buffer(_t.structure_ids, _t.n_tag_points*ffi.sizeof('int')), dtype='int32')
+            
+        else:
+            self.structure_ids=None
+
+        if _t.patient_ids is not None:
+            self.patient_ids=np.empty(_t.n_tag_points,np.int_,'C')
+            self.patient_ids[:]=np.frombuffer(ffi.buffer(_t.patient_ids, _t.n_tag_points*ffi.sizeof('int')), dtype='int32')
+
+        # TODO: add labels vectors
+        if _t.labels is not None:
+            self.labels=[]
+            for i in range(_t.n_tag_points):
+                self.labels.append(ffi.string(_t.labels[i]))
+        else:
+            self.labels=None
 
 # kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl python; show-tabs on
