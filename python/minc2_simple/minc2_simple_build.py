@@ -8,9 +8,11 @@ ffi = FFI()
 minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.16")
 source_path=os.path.join(os.path.dirname(__file__), "../../src")
 
-_extra_link_args=['-g']
-_extra_compile_args=['-fsanitize=address','-fno-omit-frame-pointer','-g']
+_extra_link_args_debug=['-g']
+_extra_compile_args_debug=['-fsanitize=address','-fno-omit-frame-pointer','-g']
 
+_extra_link_args=[]
+_extra_compile_args=[]
 
 src=""
 
@@ -530,4 +532,4 @@ int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val);
 
 
 if __name__ == "__main__":
-    ffi.compile(verbose=True,debug=True)
+    ffi.compile(verbose=True)
