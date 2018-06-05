@@ -5,8 +5,12 @@ from sys import platform
   
 ffi = FFI()
 
-minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.15")
+minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.16")
 source_path=os.path.join(os.path.dirname(__file__), "../../src")
+
+_extra_link_args=['-g']
+_extra_compile_args=['-fsanitize=address','-fno-omit-frame-pointer','-g']
+
 
 src=""
 
@@ -15,7 +19,6 @@ with open(os.path.join(source_path,"minc2-simple.c"),'r') as f:
 with open(os.path.join(source_path,"minc2-matrix-ops.c"),'r') as f:
     src+=f.read()
 
-_extra_link_args=[]
 
 if platform == "linux" or platform == "linux2":
   _extra_link_args=['-Wl,-rpath={}'.format(os.path.join(minc_prefix,"lib"))]
@@ -29,6 +32,7 @@ ffi.set_source("minc2_simple._simple",
     libraries=["minc2","c"],
     include_dirs=[os.path.join(minc_prefix,"include"),source_path],
     library_dirs=[os.path.join(minc_prefix,"lib")],
+    extra_compile_args=_extra_compile_args,
     extra_link_args=_extra_link_args
 )
 
@@ -526,4 +530,4 @@ int minc2_iterator_put_values(minc2_file_iterator_handle h,const void *val);
 
 
 if __name__ == "__main__":
-    ffi.compile(verbose=True)
+    ffi.compile(verbose=True,debug=True)

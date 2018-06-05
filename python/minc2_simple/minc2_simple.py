@@ -8,8 +8,8 @@ import sys
 import collections
 
 class minc2_error(Exception):
-    def __init__(self):
-        pass 
+    def __init__(self,message=""):
+        super(minc2_error, self).__init__(message)
     pass
 
 class minc2_transform_parameters(object):
@@ -98,11 +98,11 @@ class minc2_file:
         
     def open(self, path):
         if lib.minc2_open(self._v, to_bytes(path))!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Can't open file:"+path)
         
     def close(self):
         if lib.minc2_close(self._v)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error closing file")
         
     def ndim(self):
         dd=ffi.new("int*", 0)
@@ -112,7 +112,7 @@ class minc2_file:
     def store_dims_(self):
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_store_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error defining dimensions")
         return dims[0]
 
     def minc2_dim_to_python_(self,d):
@@ -130,7 +130,7 @@ class minc2_file:
     def representation_dims_(self):
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_representation_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error getting dimension information")
         return dims[0]
 
     def representation_dims(self):
@@ -169,7 +169,7 @@ class minc2_file:
             _dims[len(dims)]={'id':lib.MINC2_DIM_END}
 
         if lib.minc2_define(self._v, _dims, _store_type, _representation_type)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error defining new minc file")
 
         if slice_scaling is not None or global_scaling is not None:
             _slice_scaling=0
@@ -183,11 +183,11 @@ class minc2_file:
 
     def create(self, path):
         if lib.minc2_create(self._v, to_bytes(path) )!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error creating file:"+path)
     
     def copy_metadata(self, another):
         if lib.minc2_copy_metadata(another._v,self._v)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error copying metadata")
     
     def load_complete_volume(self, data_type=None):
         import numpy as np
@@ -212,10 +212,10 @@ class minc2_file:
             dtype=data_type
             data_type=minc2_file.__numpy_to_minc2[dtype.name]
         else:
-            raise minc2_error()
+            raise minc2_error("Unsupported buffer data type:"+repr(data_type))
         buf=np.empty(shape,dtype,'C')
         if lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.ctypes.data) , data_type)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error loading volume")
         return buf
 
     def load_complete_volume_tensor(self, data_type=None):
@@ -238,17 +238,17 @@ class minc2_file:
             dtype=eval(data_type)
             data_type=minc2_file.__torch_to_minc2[data_type]
         else:
-            raise minc2_error()
+            raise minc2_error("Unsupported data type:"+repr(data_type))
 
         buf=dtype(*shape)
 
         if lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.storage().data_ptr()) , data_type)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error loading volume")
         return buf
 
     def setup_standard_order(self):
         if lib.minc2_setup_standard_order(self._v)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error setting up standard volume order")
     
     def save_complete_volume(self, buf):
         import numpy as np
@@ -262,11 +262,11 @@ class minc2_file:
         data_type=minc2_file.__numpy_to_minc2[store_type]
         
         if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.ctypes.data),data_type)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error saving volume")
         return buf
 
     def save_complete_volume_tensor(self, buf):
-        import torch
+        #import torch
         data_type=lib.MINC2_FLOAT
         store_type=buf.type()
 
@@ -276,7 +276,7 @@ class minc2_file:
         data_type=minc2_file.__torch_to_minc2[store_type]
 
         if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.storage().data_ptr()),data_type)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error saving volume")
         return buf
 
     def read_attribute(self, group, attribute):
@@ -293,18 +293,16 @@ class minc2_file:
         # assume that if we can't get attribute type, it's missing, return nil
 
         if lib.minc2_get_attribute_type(self._v, group, attribute, attr_type)!=lib.MINC2_SUCCESS:
-            print("Error getting attribute type {}:{}".format(group,attribute),file=sys.stderr)
-            return None
+            raise minc2_error("Error getting attribute type {}:{}".format(group,attribute))
 
         if lib.minc2_get_attribute_length(self._v, group, attribute, attr_length)!=lib.MINC2_SUCCESS:
-            print("Error getting attribute length {}:{}".format(group,attribute),file=sys.stderr)
-            raise minc2_error()
+            raise minc2_error("Error getting attribute length {}:{}".format(group,attribute))
+            
 
         if attr_type[0] == lib.MINC2_STRING:
             buf = ffi.new("char[]", attr_length[0])
             if lib.minc2_read_attribute(self._v,group,attribute,buf,attr_length[0])!=lib.MINC2_SUCCESS:
-                print("Error reading string attribute {}:{}".format(group,attribute),file=sys.stderr)
-                raise minc2_error()
+                raise minc2_error("Error reading string attribute {}:{}".format(group,attribute))
             return ffi.string(buf, attr_length[0])
         else:
             data_type=attr_type[0]
@@ -314,12 +312,11 @@ class minc2_file:
                 shape=[attr_length[0]]
                 buf=np.empty(shape,dtype,'C')
             else:
-                print("Error determining attribute type {}:{}".format(group,attribute),file=sys.stderr)
-                raise minc2_error()
+                raise minc2_error("Error determining attribute type {}:{}".format(group,attribute))
+                
 
             if lib.minc2_read_attribute(self._v,group,attribute,ffi.cast("void *", buf.ctypes.data),attr_length[0])!=lib.MINC2_SUCCESS:
-                print("Error reading attribute {}:{}".format(group,attribute),file=sys.stderr)
-                raise minc2_error()
+                raise minc2_error("Error reading attribute {}:{}".format(group,attribute))
 
             return buf
 
@@ -334,8 +331,8 @@ class minc2_file:
             attr_type=lib.MINC2_STRING
             attr_length=len(value)
 
-            if lib.minc2_write_attribute(self._v,group, attribute, value, attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
-                raise minc2_error()
+            if lib.minc2_write_attribute(self._v, group, attribute, value, attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
+                raise minc2_error("Error writing attribute {}:{}".format(group,attribute))
         else:
             import numpy as np
             data_type=lib.MINC2_FLOAT
@@ -345,7 +342,7 @@ class minc2_file:
             data_type=minc2_file.__numpy_to_minc2[store_type]
 
             if lib.minc2_write_attribute(self._v, group, attribute, ffi.cast("void *", value.ctypes.data), value.size, data_type)!=lib.MINC2_SUCCESS:
-                raise minc2_error()
+                raise minc2_error("Error writing attribute {}:{}".format(group,attribute))
 
     def metadata(self):
         ret={}
@@ -354,12 +351,12 @@ class minc2_file:
         attr_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), lib.minc2_free_info_iterator)
 
         if lib.minc2_start_group_iterator(self._v,group_iterator)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error navigating groups")
 
         while lib.minc2_iterator_group_next(group_iterator)==lib.MINC2_SUCCESS:
             gname=lib.minc2_iterator_group_name(group_iterator)
             if lib.minc2_start_attribute_iterator(self._v, gname, attr_iterator)!=lib.MINC2_SUCCESS:
-                raise minc2_error()
+                raise minc2_error("Error iterating group:"+gname)
             g={}
 
             while lib.minc2_iterator_attribute_next(attr_iterator)==lib.MINC2_SUCCESS:
@@ -380,19 +377,19 @@ class minc2_file:
     def store_dtype(self):
         _dtype=ffi.new("int*",0)
         if lib.minc2_storage_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error setting store type")
         return minc2_file.__minc2_to_numpy[_dtype[0]]
 
     def representation_dtype(self):
         _dtype=ffi.new("int*",0)
         if lib.minc2_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error setting representation type")
         return minc2_file.__minc2_to_numpy[_dtype[0]]
 
     def representation_dtype_tensor(self):
         _dtype=ffi.new("int*",0)
         if lib.minc2_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
-            raise minc2_error()
+            raise minc2_error("Error setting representation type")
         return minc2_file.__minc2_to_torch[_dtype[0]]
 
     # shortcut to setup_standard_order;load_complete_volume
@@ -438,7 +435,7 @@ class minc2_file:
 
             ndims =self.ndim()
             _dims = self.representation_dims_()
-            #dims = buf.shape
+            #dims = buf.shape # can't be used if we are using array with missing dimensions
 
             # TODO: unsqueeze array
 
@@ -454,23 +451,19 @@ class minc2_file:
                         else: # assume it's the whole dimension
                             slab_count[ndims-1-i]=_dims[ndims-i-1].length
                             slab_start[ndims-1-i]=0
-                    else: #assume it's a number
-                        slab_count[ndims-1-i]=_dims[ndims-i-1].length
+                    else: # assume it's a number
+                        slab_count[ndims-1-i]=1 # _dims[ndims-i-1].length
                         slab_start[ndims-1-i]=start[i]
                 else:
                     slab_count[ndims-1-i]=_dims[ndims-i-1].length
                     slab_start[ndims-1-i]=0
             
-            for i in range(ndims):
-                print("slab_count[{}]={}".format(i,slab_count[i]))
-                print("slab_start[{}]={}".format(i,slab_start[i]))
-
             data_type=minc2_file.__numpy_to_minc2[store_type]
 
             if lib.minc2_write_hyperslab( self._v, slab_start, slab_count,
                                           ffi.cast("void *", buf.ctypes.data),
                                           data_type ) != lib.MINC2_SUCCESS:
-                raise minc2_error()
+                raise minc2_error("Error writing hyperslab")
             return buf
 
     def save_hyperslab_t(self, buf, start=None):
@@ -486,7 +479,8 @@ class minc2_file:
             data_type=minc2_file.__torch_to_minc2[store_type]
 
             ndims =self.ndim()
-            dims = buf.size()
+            #dims = buf.size()
+            _dims = self.representation_dims_()
 
             slab_start=ffi.new("int[]",ndims)
             slab_count=ffi.new("int[]",ndims)
@@ -497,20 +491,20 @@ class minc2_file:
                         if len(start[i])==2:
                             slab_count[ndims-1-i]=start[i][1]-start[i][0]
                             slab_start[ndims-1-i]=start[i][0]
-                        else: # assume it's the whole dimension
-                            slab_count[ndims-1-i]=dims[i]
+                        else: # assume it's the whole dimension (?)
+                            slab_count[ndims-1-i]=_dims[ndims-1-i]
                             slab_start[ndims-1-i]=0
                     else: #assume it's a number
-                        slab_count[ndims-1-i]=dims[i]
+                        slab_count[ndims-1-i]=1 # dims[i]
                         slab_start[ndims-1-i]=start[i]
-                else:
-                    slab_count[ndims-1-i]=dims[i]
+                else: # use the whole dimension (?)
+                    slab_count[ndims-1-i]=_dims[ndims-1-i]
                     slab_start[ndims-1-i]=0
 
             if lib.minc2_write_hyperslab( self._v, slab_start, slab_count,
                                           ffi.cast("void *", buf.storage().data_ptr()),
                                           data_type ) != lib.MINC2_SUCCESS:
-                raise minc2_error()
+                raise minc2_error("Error writing hyperslab")
             return buf
 
     def load_hyperslab(self, slab=None, data_type=None):
@@ -556,14 +550,14 @@ class minc2_file:
                 dtype=data_type
                 data_type=minc2_file.__numpy_to_minc2[dtype.name]
             else:
-                raise minc2_error()
+                raise minc2_error("Unsupported data type:"+repr(data_type))
 
             buf = np.empty(dims, dtype, 'C')
 
             if lib.minc2_read_hyperslab( self._v, slab_start, slab_count,
                                          ffi.cast("void *", buf.ctypes.data),
                                          data_type ) != lib.MINC2_SUCCESS:
-                raise minc2_error()
+                raise minc2_error("Error writing hyperslab")
             return buf
 
     def load_hyperslab_t(self, slab=None, data_type=None):
@@ -607,14 +601,14 @@ class minc2_file:
                 dtype=eval(data_type)
                 data_type=minc2_file.__torch_to_minc2[data_type]
             else:
-                raise minc2_error()
+                raise minc2_error("Unsupported data type:"+repr(data_type))
 
             buf=dtype(*dims)
 
             if lib.minc2_read_hyperslab( self._v, slab_start, slab_count,
                                          ffi.cast("void *", buf.storage().data_ptr()),
                                          data_type ) != lib.MINC2_SUCCESS:
-                raise minc2_error()
+                raise minc2_error("Error reading hyperslab")
             return buf
 
     def _slices_to_slab(self, args):
@@ -625,8 +619,7 @@ class minc2_file:
         ndims = self.ndim()
 
         if len(args)!=self.ndim():
-            # unsupported number of dimensions
-            raise minc2_error()
+            raise minc2_error("Unsupported number of dimensions")
 
         for i,a in enumerate(args):
             if isinstance(a, slice):
@@ -637,20 +630,16 @@ class minc2_file:
             elif isinstance(a, int):
                 slab+=[a]
             else:
-                raise minc2_error()
-        #print(args,slab)
+                raise minc2_error("Unsupported dimension type:"+repr(a))
         return slab
 
     def __getitem__(self,s):
         idx=self._slices_to_slab(s)
-        print("getitem {} - {}".format(repr(s),repr(idx)))
         return self.load_hyperslab(idx).squeeze()
 
     def __setitem__(self, s, val):
         idx=self._slices_to_slab(s)
-        print("setitem {} - {}".format(repr(s),repr(idx)))
         return self.save_hyperslab(val,idx)
-        
 
 class minc2_xfm:
     # constants

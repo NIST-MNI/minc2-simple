@@ -8,11 +8,10 @@ import tempfile
 
 from minc2_simple import minc2_file,minc2_xfm,minc2_error
 
-
 def setUpModule():
     global outputFilename,emptyFilename,newFilename,inputFile_byte,inputFile_short,inputFile_int
     global inputFile_float,inputFile_double,inputFile_ubyte,inputFile_ushort,inputFile_uint
-    global inputVector,input3DdirectionCosines,outputXfmFilename1,outputXfmFilename2,outputXfmFilename3
+    global inputVector,input3DdirectionCosines
     
     
     outputFilename = tempfile.NamedTemporaryFile(prefix="test-out-", suffix=".mnc").name
@@ -54,14 +53,6 @@ def setUpModule():
                         '-ydircos', '-0.1958356912',  '0.96692346178', '0.16316734231',
                         '-zdircos', '-9.3093890238', '-0.21882376893', '0.92542348732'])
 
-    # testing for applying transformations to coordinates:
-    outputXfmFilename1 = tempfile.NamedTemporaryFile(prefix="test-xfm-1", suffix=".xfm").name
-    outputXfmFilename2 = tempfile.NamedTemporaryFile(prefix="test-xfm-2", suffix=".xfm").name
-    outputXfmFilename3 = tempfile.NamedTemporaryFile(prefix="test-xfm-3", suffix=".xfm").name
-
-    subprocess.check_call(["param2xfm", "-center", '2.21', '-3.765', '4.09', "-translation", '1.23', '6.4', '-7.8', "-scales", '0.2', '4.3', '-3', outputXfmFilename1])
-    subprocess.check_call(["param2xfm", "-center", '-23.98', '0.46', '9.5', "-translation", '0.0', '-46', '89.3', "-scales", '10', '7.33', '84', outputXfmFilename2])
-    subprocess.check_call(["xfmconcat", outputXfmFilename1, outputXfmFilename2, outputXfmFilename3])
 
 
 
@@ -82,11 +73,8 @@ def tearDownModule():
     if os.path.exists(newFilename):
         os.remove(newFilename)
     
-    os.remove(outputXfmFilename1)
-    os.remove(outputXfmFilename2)
-    os.remove(outputXfmFilename3)
 
-class TestFromFile(unittest.TestCase):
+class minc2_file_io_numpy(unittest.TestCase):
     """test the minc2_file reading using numpy"""
     def testFromFileError(self):
         """attempting to load a garbage file should raise exception"""
@@ -143,7 +131,6 @@ class TestFromFile(unittest.TestCase):
         """ensure that byte data is read correct with a precision of 8 decimals on a call to average()"""
         v = minc2_file(inputFile_byte)
         a = N.average(v.load_complete_volume('float64'))
-        print(a)
         v.close()
         pipe = os.popen("mincstats -mean -quiet %s" % inputFile_byte, "r")
         output = float(pipe.read())
@@ -186,16 +173,25 @@ class TestFromFile(unittest.TestCase):
         pipe.close()
         self.assertAlmostEqual(a, output, 8)
     def testDims(self):
-        """Check data dimensions"""
+        """Check data dimensions are correct"""
         v = minc2_file(inputFile_double) 
         v.setup_standard_order()
-        print(v.representation_dims())
-        print(v.store_dims())
+        dims=v.store_dims()
+
+        self.assertEqual(len(dims), 3)
+        # '100', '150', '125'    
+        self.assertEqual(dims[0].id, minc2_file.MINC2_DIM_X) ## X
+        self.assertEqual(dims[0].length, 125 )
+        self.assertEqual(dims[1].id, minc2_file.MINC2_DIM_Y) ## Y
+        self.assertEqual(dims[1].length, 150 )
+        self.assertEqual(dims[2].id, minc2_file.MINC2_DIM_Z) ## X
+        self.assertEqual(dims[2].length, 100 )
+
         
 try:
     import torch # this is going to work only if torch is present
     
-    class TestFromFileTensor(unittest.TestCase):
+    class minc2_file_io_torch(unittest.TestCase):
         """test the minc2_file reading using pytorch tensor"""
         def testFromFileDataTypeByte(self):
             """ensure byte data is read as float by default"""
@@ -330,7 +326,7 @@ class TestWriteFileDataTypes(unittest.TestCase):
         # TODO
         pass
 
-class TestHyperslabs(unittest.TestCase):
+class minc2_file_hyperslabs_numpy(unittest.TestCase):
     """test getting and setting of hyperslabs"""
     def testGetHyperslab(self):
         """hyperslab should be same as slice from data array"""
@@ -471,11 +467,10 @@ class TestHyperslabs(unittest.TestCase):
             v2.close()
             v.close()
 
-if False:
     try: # run tests if torch is present
         import torch
         
-        class TestHyperslabsTensors(unittest.TestCase):
+        class minc2_file_hyperslabs_torch(unittest.TestCase):
             """test getting and setting of hyperslabs"""
             def testGetHyperslab(self):
                 """hyperslab should be same as slice from data array"""
@@ -631,45 +626,6 @@ class testDirectionCosines(unittest.TestCase):
         self.assertAlmostEqual(dims[2].dir_cos[0], float(from_file[0]), 8)
         self.assertAlmostEqual(dims[2].dir_cos[1], float(from_file[1]), 8)
         self.assertAlmostEqual(dims[2].dir_cos[2], float(from_file[2]), 8)
-        
-
-class testXfmsAppliedToCoordinates(unittest.TestCase):
-    """test that xfm files can be used to transform x,y,z coordinates"""
-    def testForwardTransformSingleXfm(self):
-        """testing coordinates transformed using the forward transform and a single transformation"""
-        _xfm=minc2_xfm(outputXfmFilename1)
-        out=_xfm.transform_point([6.68, 3.14, 7.00])
-        self.assertAlmostEqual(out[0], 4.33400016486645, 8)
-        self.assertAlmostEqual(out[1], 32.3265016365052, 8)
-        self.assertAlmostEqual(out[2], -12.4399995803833, 8)
-    
-    def testInverseTransformSingleXfm(self):
-        """testing coordinates transformed using the inverse transform and a single transformation"""
-        
-        _xfm=minc2_xfm(outputXfmFilename1)
-        out=_xfm.inverse_transform_point([6.68, 3.14, 7.00])
-        self.assertAlmostEqual(out[0], 18.4099990008772, 8)
-        self.assertAlmostEqual(out[1], -3.64755821904214, 8)
-        self.assertAlmostEqual(out[2], 0.520000139872233, 8)
-    
-    def testForwardTransformConcatenatedXfm(self):
-        """testing coordinates transformed using the forward transform and a concatenated transformation"""
-        
-        _xfm=minc2_xfm(outputXfmFilename3)
-        out=_xfm.transform_point([6.68, 3.14, 7.00])
-        self.assertAlmostEqual(out[0],  259.159993714094, 8)
-        self.assertAlmostEqual(out[1],  188.041454144745, 8)
-        self.assertAlmostEqual(out[2], -1744.15997695923, 8)
-    
-    def testInverseTransformConcatenatedXfm(self):
-        """testing coordinates transformed using the inverse transform and a concatenated transformation"""
-        
-        _xfm=minc2_xfm(outputXfmFilename3)
-        out=_xfm.inverse_transform_point([6.68, 3.14, 7.00])
-        self.assertAlmostEqual(out[0], -119.559994975925, 8)
-        self.assertAlmostEqual(out[1], -2.72634880128239, 8)
-        self.assertAlmostEqual(out[2], 0.0509524723840147, 8)
-    
         
         
 if __name__ == "__main__":
