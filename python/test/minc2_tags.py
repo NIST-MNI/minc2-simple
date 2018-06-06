@@ -9,10 +9,11 @@ import tempfile
 from minc2_simple import minc2_file, minc2_xfm, minc2_error, minc2_tags
 
 def setUpModule():
-    global tagFilename1
+    global tagFilename1,tagFilename2
     
      # testing for applying transformations to coordinates:
     tagFilename1 = tempfile.NamedTemporaryFile(prefix="test-tags1", suffix=".tag").name
+    tagFilename2 = tempfile.NamedTemporaryFile(prefix="test-tags2", suffix=".tag").name
     
     with open(tagFilename1,'w') as f:
         f.write("""MNI Tag Point File
@@ -41,12 +42,12 @@ Points =
     #
     
 def tearDownModule():
-   
     os.remove(tagFilename1)
+    os.remove(tagFilename2)
    
 class testTags(unittest.TestCase):
     """test that xfm files can be used to transform x,y,z coordinates"""
-    def testTagsOpen(self):
+    def testTagsLoad(self):
         """Testing that we can open and read tags"""
         _tags=minc2_tags(tagFilename1)
         print("\nTag points:")
@@ -59,6 +60,29 @@ class testTags(unittest.TestCase):
         print(_tags.patient_ids)
         print("labels")
         print(_tags.labels)
+
+    def testTagsSave(self):
+        _tags=minc2_tags(tagFilename1)
+
+        # save
+        _tags.save(tagFilename2)
+        import re
+
+        with open(tagFilename1,'r') as f:
+            tags1=f.read()
+
+        with open(tagFilename2,'r') as f:
+            tags2=f.read()
+
+        # strip comment
+        tags1=re.sub(r"^\%.*$","",tags1,flags=re.MULTILINE)
+        tags2=re.sub(r"^\%.*$","",tags2,flags=re.MULTILINE)
+
+        self.maxDiff=None
+        self.assertEqual(tags1,tags2)
+        
+
+
         
 if __name__ == "__main__":
     unittest.main()

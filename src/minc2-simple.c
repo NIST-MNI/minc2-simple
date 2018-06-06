@@ -2083,7 +2083,9 @@ int minc2_tags_free(minc2_tags_handle tags)
     for(i=0;i<tags->n_tag_points;i++)
     {
       if(tags->labels[i])
-        free(tags->labels[i]);
+      {
+         free(tags->labels[i]);
+      }
     }
     free(tags->labels);
   }
@@ -2146,28 +2148,38 @@ static int minc2_tags_convert_from_VIO(minc2_tags_handle tags,
   if(n_volumes>1 && tags_volume2){
     tags->tags_volume2=malloc(n_tag_points*3*sizeof(double));
     _convert_array_from_VIO(tags->tags_volume2, tags_volume2, n_tag_points);
+  } else {
+    tags->tags_volume2=NULL;
   }
 
   if(weights) {
     int i;
     tags->weights=malloc(n_tag_points*sizeof(double));
     for(i=0;i<n_tag_points;i++) tags->weights[i]=weights[i];
+  } else {
+    tags->weights=NULL;
   }
 
   if(structure_ids) {
     tags->structure_ids=malloc(n_tag_points*sizeof(int));
     memmove(tags->structure_ids, structure_ids, sizeof(int)*n_tag_points);
+  } else {
+    tags->structure_ids=NULL;
   }
 
   if(patient_ids) {
     tags->patient_ids=calloc(n_tag_points,sizeof(int));
     memmove(tags->patient_ids,patient_ids,sizeof(int)*n_tag_points);
+  } else {
+    tags->patient_ids=NULL;
   }
 
   if(labels) {
     int i;
     tags->labels=malloc(n_tag_points*sizeof(const char *));
     for(i=0;i<n_tag_points;i++) tags->labels[i]=strdup(labels[i]);
+  } else {
+    tags->labels=NULL;
   }
 
   /*TODO: check if all memoru properly allocated*/
@@ -2211,17 +2223,26 @@ static int minc2_tags_convert_to_VIO(minc2_tags_handle tags,
   if(tags->structure_ids) {
     *structure_ids=malloc(tags->n_tag_points*sizeof(int));
     memmove(*structure_ids,tags->structure_ids,sizeof(int)*tags->n_tag_points);
+  } else {
+    *structure_ids=NULL;
   }
 
   if(tags->patient_ids) {
     *patient_ids=malloc(tags->n_tag_points*sizeof(int));
     memmove(*patient_ids,tags->patient_ids,sizeof(int)*tags->n_tag_points);
+  } else {
+    *patient_ids=NULL;
   }
 
   if(tags->labels) {
     int i;
     *labels=malloc(tags->n_tag_points*sizeof(const char *));
-    for(i=0;i< tags->n_tag_points ;i++) (*labels)[i]=strdup(tags->labels[i]);
+    for(i=0;i< tags->n_tag_points ;i++) {
+      if(tags->labels[i]) (*labels)[i]=strdup(tags->labels[i]);
+      else  (*labels)[i]=strdup("");
+    }
+  } else {
+    *labels=NULL;
   }
 
   /*TODO: check if all memoru properly allocated*/

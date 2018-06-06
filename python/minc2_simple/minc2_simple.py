@@ -782,7 +782,7 @@ class minc2_tags:
         self.labels=None
 
         if path is not None:
-            self.open(path)
+            self.load(path)
 
     def __len__(self):
         if self.tag[0] is not None:
@@ -790,11 +790,11 @@ class minc2_tags:
         else:
             return 0
 
-    def open(self, path):
+    def load(self, path):
         """
         load tags from a file
         """
-        assert path is not None,"Provide minc2 file"
+        assert path is not None,"Provide tag file"
         _t=ffi.gc(lib.minc2_tags_allocate0(),lib.minc2_tags_free)
         assert(lib.minc2_tags_load(_t,to_bytes(path))==lib.MINC2_SUCCESS)
         import numpy as np
@@ -817,20 +817,74 @@ class minc2_tags:
         if _t.structure_ids is not None:
             self.structure_ids=np.zeros(_t.n_tag_points, np.int_,'C')
             self.structure_ids[:]=np.frombuffer(ffi.buffer(_t.structure_ids, _t.n_tag_points*ffi.sizeof('int')), dtype='int32')
-            
         else:
             self.structure_ids=None
 
         if _t.patient_ids is not None:
             self.patient_ids=np.empty(_t.n_tag_points,np.int_,'C')
             self.patient_ids[:]=np.frombuffer(ffi.buffer(_t.patient_ids, _t.n_tag_points*ffi.sizeof('int')), dtype='int32')
+        else:
+            self.patient_ids=None
 
-        # TODO: add labels vectors
         if _t.labels is not None:
             self.labels=[]
             for i in range(_t.n_tag_points):
                 self.labels.append(ffi.string(_t.labels[i]))
         else:
             self.labels=None
+
+    def save(self,path):
+        assert path is not None,"Provide tag file"
+        _t=ffi.gc(lib.minc2_tags_allocate0(),lib.minc2_tags_free)
+
+        import numpy as np
+        import weakref
+        # convert numpy arrays to internal data structure 
+        assert self.n_volumes==1 or self.n_volumes==2 
+        assert self.n_volumes == len(self.tag)
+
+        if self.tag[0] is not None:
+            weakdict = weakref.WeakKeyDictionary()
+
+            shape=self.tag[0].shape
+            assert shape[1]==3
+            if self.n_volumes==2 :
+                assert self.tag[1].shape == self.tag[0].shape
+
+            assert lib.minc2_tags_init(_t,shape[0],self.n_volumes,1 if self.weights is not None else 0,1 if self.structure_ids is not None else 0,1 if self.patient_ids is not None else 0,1 if self.labels is not None else 0)==lib.MINC2_SUCCESS
+
+            ffi.memmove(_t.tags_volume1, ffi.cast("double *",self.tag[0].ctypes.data),  _t.n_tag_points*3*ffi.sizeof('double'))
+            if self.n_volumes>1:
+                ffi.memmove( _t.tags_volume2, ffi.cast("double *",self.tag[1].ctypes.data),  _t.n_tag_points*3*ffi.sizeof('double'))
+            #
+            if self.weights is not None:
+                ffi.memmove( _t.weights, ffi.cast("double *",self.weights.ctypes.data), _t.n_tag_points*ffi.sizeof('double'))
+                
+            if self.structure_ids is not None:
+                np.frombuffer(ffi.buffer(_t.structure_ids, _t.n_tag_points*ffi.sizeof('int')), dtype='int32')[:] = \
+                    self.structure_ids[:]
+
+            if self.patient_ids is not None:
+                np.frombuffer(ffi.buffer(_t.patient_ids, _t.n_tag_points*ffi.sizeof('int')), dtype='int32')[:] = \
+                    self.patient_ids[:]
+
+            weakdict[_t] = []
+            if self.labels is not None:
+                for i in range(shape[0]):
+                    ss=ffi.new("char[]",to_bytes(self.labels[i]))
+                    _t.labels[i] = ss # WARNING: have to make sure C code doesn't try to free these strings
+                    weakdict[_t].append(ss)
+                    
+            # save to disk
+            assert lib.minc2_tags_save(_t,to_bytes(path))==lib.MINC2_SUCCESS
+
+            if self.labels is not None:
+                  for i in range(shape[0]):
+                      _t.labels[i] = ffi.cast("void *", 0)
+            
+            print("tag labels should be de-allocated now")
+        else: # it's empty
+            pass
+        assert lib.minc2_tags_save(_t,to_bytes(path))==lib.MINC2_SUCCESS
 
 # kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl python; show-tabs on
