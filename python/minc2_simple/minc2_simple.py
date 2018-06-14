@@ -417,11 +417,41 @@ class minc2_file:
         self.setup_standard_order()
         self.save_complete_volume_tensor(new_data)
 
+    def get_shape(self):
+        """
+        get volume shape (numpy style)
+        """
+        _dims=self.representation_dims_()
+        return tuple( _dims[i].length for i in range(self.ndim()) )
+
+    def get_start(self):
+        """
+        get volume starts (numpy style)
+        """
+        _dims=self.representation_dims_()
+        return tuple(_dims[i].start for i in range(self.ndim()))
+
+    def get_step(self):
+        """
+        get volume steps (numpy style)
+        """
+        _dims=self.representation_dims_()
+        return tuple(_dims[i].step for i in range(self.ndim()))
+
     # get/set whole volume
     data = property(get_data,set_data,None,"Complete volume")
 
     # get/set whole volume
     tensor = property(get_tensor,set_tensor,None,"Complete volume")
+
+    # get volume shape
+    shape = property(get_shape,None,None,"Volume shape (numpy style)")
+
+    # get volume start
+    start = property(get_start,None,None,"Volume start (numpy style)")
+
+    # get volume step
+    step = property(get_step,None,None,"Volume step (numpy style)")
 
     # hyperslab-based functions
     def set_volume_range(self, rmin, rmax):
