@@ -21,9 +21,13 @@ with open(os.path.join(source_path,"minc2-simple.c"),'r') as f:
     minc2_simple_src=f.read()
 with open(os.path.join(source_path,"minc2-matrix-ops.c"),'r') as f:
     minc2_simple_src+=f.read()
-
 with open(os.path.join(source_path,"minc2-simple-int.h"),'r') as f:
   minc2_simple_defs+=f.read()
+
+# add free system call
+minc2_simple_defs+="""
+void free(void *ptr);
+"""
 
 if platform == "linux" or platform == "linux2":
   _extra_link_args=['-Wl,-rpath={}'.format(os.path.join(minc_prefix,"lib"))]
