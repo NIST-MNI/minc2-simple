@@ -592,7 +592,7 @@ class minc2_file:
             if lib.minc2_read_hyperslab( self._v, slab_start, slab_count,
                                          ffi.cast("void *", buf.ctypes.data),
                                          data_type ) != lib.MINC2_SUCCESS:
-                raise minc2_error("Error writing hyperslab")
+                raise minc2_error("Error reading hyperslab")
             return buf
 
     def load_hyperslab_t(self, slab=None, data_type=None):
