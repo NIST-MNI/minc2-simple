@@ -34,6 +34,7 @@ class minc2_transform_parameters(object):
 
 minc2_dim=collections.namedtuple('minc2_dim',['id','length', 'start', 'step', 'have_dir_cos', 'dir_cos'])
 
+
 class minc2_file:
     """
     MINC2 file object (Volume)
@@ -130,8 +131,7 @@ class minc2_file:
     def store_dims(self):
         d_=self.store_dims_()
         return [ self.minc2_dim_to_python_(d_[j]) for j in range(self.ndim())]
-   
-        
+
     def representation_dims_(self):
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_representation_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
@@ -139,29 +139,52 @@ class minc2_file:
         return dims[0]
 
     def representation_dims(self):
-        d_=self.representation_dims_()
+        d_ = self.representation_dims_()
         return [ self.minc2_dim_to_python_(d_[j]) for j in range(self.ndim() ) ]
-    
-    def define(self, dims, store_type=None, representation_type=None, slice_scaling=None, global_scaling=None):
-        _dims=dims
+
+    def imitate(self, another, store_type=None, representation_type=None, path=None):
+        """
+        :param another: another minc2_file object or path to a file
+        :param store_type: data type for storage
+        :param representation_type: preferred data type for representation
+        :param path file path to generate
+        :return: None
+        """
+
+        if not isinstance(another, minc2_file):
+            another_ = minc2_file(another)
+        else:
+            another_ = another
+
+        if store_type is None:
+            store_type = another_.store_dtype()
+        if representation_type is None:
+            representation_type = another.representation_dtype()
+        # copy data
+        self.define(another_.store_dims(), store_type=store_type, representation_type=representation_type)
+        if path is not None:
+            self.create(path)
+
+    def define(self, dims, store_type=None, representation_type=None, slice_scaling=None, global_scaling=None, path=None):
+        _dims = dims
         if store_type is None:
             store_type=lib.MINC2_SHORT
         if representation_type is None:
             representation_type=store_type
 
-        _store_type=store_type
-        _representation_type=representation_type
+        _store_type = store_type
+        _representation_type = representation_type
 
         if isinstance(_store_type, six.string_types):
-            _store_type=minc2_file.__numpy_to_minc2[_store_type]
+            _store_type = minc2_file.__numpy_to_minc2[_store_type]
 
         if isinstance(_representation_type, six.string_types):
-            _representation_type=minc2_file.__numpy_to_minc2[_representation_type]
+            _representation_type = minc2_file.__numpy_to_minc2[_representation_type]
 
         if isinstance(dims, list ) or isinstance(dims,tuple):
             _dims = ffi.new("struct minc2_dimension[]", len(dims)+1)
             for i,j in enumerate(dims):
-                if isinstance(j,minc2_dim):
+                if isinstance(j, minc2_dim):
                     _dims[i].id=j.id
                     _dims[i].length=j.length
                     _dims[i].start=j.start
@@ -185,6 +208,8 @@ class minc2_file:
 
             if lib.minc2_set_scaling(self._v,_global_scaling,_slice_scaling )!=lib.MINC2_SUCCESS:
                 raise minc2_error()
+        if path is not None:
+            self.create(path)
 
     def create(self, path):
         if lib.minc2_create(self._v, to_bytes(path) )!=lib.MINC2_SUCCESS:
@@ -380,13 +405,13 @@ class minc2_file:
                 self.write_attribute(group,attr,a)
 
     def store_dtype(self):
-        _dtype=ffi.new("int*",0)
+        _dtype = ffi.new("int*",0)
         if lib.minc2_storage_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error setting store type")
         return minc2_file.__minc2_to_numpy[_dtype[0]]
 
     def representation_dtype(self):
-        _dtype=ffi.new("int*",0)
+        _dtype = ffi.new("int*",0)
         if lib.minc2_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error setting representation type")
         return minc2_file.__minc2_to_numpy[_dtype[0]]
@@ -468,7 +493,7 @@ class minc2_file:
             data_type  = lib.MINC2_FLOAT
             store_type = buf.dtype.name
 
-            ndims =self.ndim()
+            ndims = self.ndim()
             _dims = self.representation_dims_()
             #dims = buf.shape # can't be used if we are using array with missing dimensions
 
