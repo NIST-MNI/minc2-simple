@@ -464,10 +464,10 @@ class minc2_file:
         return tuple(_dims[i].step for i in range(self.ndim()))
 
     # get/set whole volume
-    data = property(get_data,set_data,None,"Complete volume")
+    data = property(get_data, set_data,None,"Complete volume")
 
     # get/set whole volume
-    tensor = property(get_tensor,set_tensor,None,"Complete volume")
+    tensor = property(get_tensor, set_tensor,None,"Complete volume")
 
     # get volume shape
     shape = property(get_shape,None,None,"Volume shape (numpy style)")
