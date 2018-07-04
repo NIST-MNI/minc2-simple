@@ -234,16 +234,20 @@ class minc2_file:
         dtype=None
         
         if data_type in minc2_file.__minc2_to_numpy:
-            dtype=minc2_file.__minc2_to_numpy[data_type]
+            dtype = minc2_file.__minc2_to_numpy[data_type]
         elif data_type in minc2_file.__numpy_to_minc2:
+            dtype = data_type
+            data_type = minc2_file.__numpy_to_minc2[dtype]
+        elif str(data_type) in minc2_file.__numpy_to_minc2:
             dtype=data_type
-            data_type=minc2_file.__numpy_to_minc2[dtype]
-        elif isinstance(data_type,np.dtype):
-            dtype=data_type
-            data_type=minc2_file.__numpy_to_minc2[dtype.name]
+            data_type = minc2_file.__numpy_to_minc2[str(dtype)]
+        elif isinstance(data_type, np.dtype):
+            dtype = data_type
+            data_type = minc2_file.__numpy_to_minc2[dtype.name]
         else:
             raise minc2_error("Unsupported buffer data type:"+repr(data_type))
-        buf=np.empty(shape,dtype,'C')
+
+        buf = np.empty(shape, dtype, 'C')
         if lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.ctypes.data) , data_type)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error loading volume")
         return buf
