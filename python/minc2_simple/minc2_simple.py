@@ -65,7 +65,7 @@ class minc2_file:
     MINC2_ICOMPLEX = lib.MINC2_ICOMPLEX 
     MINC2_FCOMPLEX = lib.MINC2_FCOMPLEX 
     MINC2_DCOMPLEX = lib.MINC2_DCOMPLEX 
-    MINC2_MAX_TYPE_ID=lib.MINC2_MAX_TYPE_ID
+    MINC2_MAX_TYPE_ID = lib.MINC2_MAX_TYPE_ID
     MINC2_UNKNOWN  = lib.MINC2_UNKNOWN  
 
     # minc2 status
@@ -73,48 +73,50 @@ class minc2_file:
     MINC2_ERROR    = lib.MINC2_ERROR
 
     # data types
-    __minc2_to_numpy={
-            lib.MINC2_BYTE :   'int8',
-            lib.MINC2_UBYTE :  'uint8',
-            lib.MINC2_SHORT :  'int16',
-            lib.MINC2_USHORT : 'uint16',
-            lib.MINC2_INT :    'int32',
-            lib.MINC2_UINT :   'uint32',
-            lib.MINC2_FLOAT :  'float32',
-            lib.MINC2_DOUBLE : 'float64',
+    __minc2_to_numpy = {
+            lib.MINC2_BYTE:   'int8',
+            lib.MINC2_UBYTE:  'uint8',
+            lib.MINC2_SHORT:  'int16',
+            lib.MINC2_USHORT: 'uint16',
+            lib.MINC2_INT:    'int32',
+            lib.MINC2_UINT:   'uint32',
+            lib.MINC2_FLOAT:  'float32',
+            lib.MINC2_DOUBLE: 'float64',
         }
-    __numpy_to_minc2 = {y:x for x,y in six.iteritems(__minc2_to_numpy)}
+    __numpy_to_minc2 = {y: x for x, y in six.iteritems(__minc2_to_numpy)}
 
-    __minc2_to_torch={
-            lib.MINC2_BYTE :   'torch.CharTensor',
-            lib.MINC2_UBYTE :  'torch.ByteTensor',
-            lib.MINC2_SHORT :  'torch.ShortTensor',
-            lib.MINC2_USHORT : 'torch.ShortTensor', # WARNING: no support for unsigned short
-            lib.MINC2_INT :    'torch.IntTensor',
-            lib.MINC2_UINT :   'torch.IntTensor', # WARNING: no support for unsigned int
-            lib.MINC2_FLOAT :  'torch.FloatTensor',
-            lib.MINC2_DOUBLE : 'torch.DoubleTensor'
+    __minc2_to_torch = {
+            lib.MINC2_BYTE:   'torch.CharTensor',
+            lib.MINC2_UBYTE:  'torch.ByteTensor',
+            lib.MINC2_SHORT:  'torch.ShortTensor',
+            lib.MINC2_USHORT: 'torch.ShortTensor', # WARNING: no support for unsigned short
+            lib.MINC2_INT:    'torch.IntTensor',
+            lib.MINC2_UINT:   'torch.IntTensor', # WARNING: no support for unsigned int
+            lib.MINC2_FLOAT:  'torch.FloatTensor',
+            lib.MINC2_DOUBLE: 'torch.DoubleTensor'
         }
     __torch_to_minc2 = {y:x for x,y in six.iteritems(__minc2_to_torch)}
     
-    def __init__(self, path=None):
-        self._v=ffi.gc(lib.minc2_allocate0(),lib.minc2_destroy)
+    def __init__(self, path=None, standard=False):
+        self._v = ffi.gc(lib.minc2_allocate0(), lib.minc2_destroy)
         if path is not None:
             self.open(path)
-        
+            if standard:
+                self.setup_standard_order()
+
     def open(self, path):
         if lib.minc2_open(self._v, to_bytes(path))!=lib.MINC2_SUCCESS:
             raise minc2_error("Can't open file:"+path)
-        
+
     def close(self):
         if lib.minc2_close(self._v)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error closing file")
-        
+
     def ndim(self):
         dd=ffi.new("int*", 0)
-        lib.minc2_ndim(self._v,dd)
+        lib.minc2_ndim(self._v, dd)
         return dd[0]
-    
+
     def store_dims_(self):
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_store_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
@@ -125,7 +127,7 @@ class minc2_file:
         import numpy as np
         dd=minc2_dim(id=d.id,length=d.length, start=d.start, step=d.step, have_dir_cos=d.have_dir_cos, dir_cos=np.zeros(3,np.float64))
         if d.have_dir_cos:
-            ffi.memmove(ffi.cast("double [3]",dd.dir_cos.ctypes.data), d.dir_cos, 3*ffi.sizeof('double'))
+            ffi.memmove(ffi.cast("double [3]", dd.dir_cos.ctypes.data), d.dir_cos, 3*ffi.sizeof('double'))
         return dd
 
     def store_dims(self):
