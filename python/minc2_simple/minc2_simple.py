@@ -161,7 +161,8 @@ class minc2_file:
         if store_type is None:
             store_type = another_.store_dtype()
         if representation_type is None:
-            representation_type = another.representation_dtype()
+            representation_type = another_.representation_dtype()
+
         # copy data
         self.define(another_.store_dims(), store_type=store_type, representation_type=representation_type)
         if path is not None:
@@ -224,7 +225,7 @@ class minc2_file:
     def load_complete_volume(self, data_type=None):
         import numpy as np
         if data_type is None:
-            data_type=self.representation_dtype()
+            data_type = np.dtype( self.representation_dtype() )
         buf=None
         _dims=self.representation_dims()
         # dims=torch.LongStorage(self:ndim())
@@ -240,9 +241,6 @@ class minc2_file:
         elif data_type in minc2_file.__numpy_to_minc2:
             dtype = data_type
             data_type = minc2_file.__numpy_to_minc2[dtype]
-        elif str(data_type) in minc2_file.__numpy_to_minc2:
-            dtype=data_type
-            data_type = minc2_file.__numpy_to_minc2[str(dtype)]
         elif isinstance(data_type, np.dtype):
             dtype = data_type
             data_type = minc2_file.__numpy_to_minc2[dtype.name]
