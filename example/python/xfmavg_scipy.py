@@ -86,7 +86,7 @@ def xfmavg(inputs, output, verbose=False):
 
 def parse_options():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                 description='Perform ')
+                                 description='Average MNI .xfm files')
 
     parser.add_argument("--verbose",
                     action="store_true",
@@ -101,7 +101,7 @@ def parse_options():
                     help="Overwrite output" )
 
     parser.add_argument("inputs",
-                        nargs='*',
+                        nargs='+',
                         help="Input xfm files")
 
     parser.add_argument("output",
@@ -114,14 +114,10 @@ def parse_options():
 
 if __name__ == '__main__':
     options = parse_options()
-    if options.inputs is not None and options.output is not None:
-        if not options.clobber and os.path.exists(options.output):
-            raise Exception("File {} exists! Run with --cloberr to overwrite".format(options.output))
+    if not options.clobber and os.path.exists(options.output):
+        raise Exception("File {} exists! Run with --clobber to overwrite".format(options.output))
         
-        xfmavg(options.inputs,options.output,verbose=options.verbose)
-    else:
-        print("Refusing to run without input data, run --help")
-        exit(1)
+    xfmavg(options.inputs,options.output,verbose=options.verbose)
 
 
 # kate: space-indent on; indent-width 4; indent-mode python;replace-tabs on;word-wrap-column 80
