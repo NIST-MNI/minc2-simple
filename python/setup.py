@@ -12,7 +12,7 @@ print(find_packages())
 setup(
     name = "minc2_simple",
 #    packages = ["minc2.simple"],
-    version="0.1",
+    version="0.2.2",
     description="MINC2 Simple interface using CFFI",
     long_description=open("README.txt", "rt").read(),
     url="https://github.com/vfonov/minc2_simple",
