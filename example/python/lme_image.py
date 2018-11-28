@@ -2,16 +2,15 @@
 
 import sys
 import os
-import pyezminc
 import csv
 
-from minc2_simple import minc2_input_iterator,minc2_output_iterator
+from minc2_simple import minc2_input_iterator,minc2_output_iterator,minc2_file
 
-import numpy as np
 import rpy2.robjects as ro
 from rpy2.robjects.numpy2ri import numpy2ri
 from rpy2.robjects.packages import importr
 from rpy2.rinterface import RRuntimeError
+import numpy as np
 
 def load_csv(csv_file):
     '''Load csv file into a dictionary'''
@@ -19,7 +18,7 @@ def load_csv(csv_file):
     # load CSV file 
     with open(input_csv,'r') as f:
         for r in csv.DictReader(f):
-            for k in r.iterkeys():
+            for k in r.keys():
                 try:
                     data[k].append(r[k])
                 except KeyError:
@@ -28,7 +27,7 @@ def load_csv(csv_file):
 
 
 # setup automatic conversion for numpy to Rpy
-numpy2ri.activate()
+#numpy2ri.activate()
 
 # import R objects
 # define R objects globally, so that we don't have to transfer them between instances
@@ -37,7 +36,7 @@ base  = importr('base')
 nlme  = importr('nlme')
 
 # read the input data
-input_csv='longitudinal.csv'
+input_csv='lng_t1nm.csv'
 #mask_file='mask.mnc'
 
 # load CSV file
@@ -53,14 +52,12 @@ group   = ro.FactorVector(data['group'])
 
 # allocate R formula, saves a little time for interpreter
 random_effects = ro.Formula('~1|subject')
-# outputs
-zero=np.zeros(shape=[6],dtype=np.float64,order='C')
 
 # this function will be executed in parallel
-def run_lme(signal,mask):
+def run_lme(signal, mask):
     # this object have to be defined within the function to avoid funny results due to concurrent execution
     fixed_effects = ro.Formula('signal ~ group+visit')
-
+    good_voxels=np.sum(mask>0.5)
     fixed_effects.environment["mask"]   = rm = ro.BoolVector(mask>0.5)
     fixed_effects.environment["signal"] = ro.FloatVector(signal).rx(rm)
     # assign variables 
@@ -71,41 +68,47 @@ def run_lme(signal,mask):
     # update jacobian variable
 
     # allocate space for output
-    result=np.zeros(shape=[6],dtype=np.float64,order='C')
+    result=np.zeros(shape=[7],dtype=np.float64,order='C')
+    result[0]=good_voxels
+    if good_voxels>4:
+        try:
+            # run linear mixed-effect model
+            l = base.summary(nlme.lme(fixed_effects,random=random_effects,method="ML"))
+            # extract coeffecients
+            result[1:4] = l.rx2('coefficients').rx2('fixed')[:]
+            # extract t-values
+            result[4:7] = l.rx2('tTable').rx(True,3)[:]
 
-    try:
-        # run linear mixed-effect model
-        l = base.summary(nlme.lme(fixed_effects,random=random_effects,method="ML"))
-        # extract coeffecients
-        result[0:3]  = l.rx2('coefficients').rx2('fixed')[:]
-        # extract t-values
-        result[3:6] = l.rx2('tTable').rx(True,3)[:]
-
-    except RRuntimeError:
-        # probably model didn't converge
+        except RRuntimeError:
+            # probably model didn't converge
+            pass
+    else:
+        # not enough information
         pass
 
     return result
 
 if __name__ == "__main__":
     
-    max_jobs_queue=100
-    
-    inp_signal=minc2_input_iterator(files=data['signal'])
-    inp_mask=minc2_input_iterator(files=data['mask'])
+    inp_signal=minc2_input_iterator(files=data['signal'],data_type=minc2_file.MINC2_DOUBLE)
+    inp_mask=minc2_input_iterator(  files=data['mask'],data_type=minc2_file.MINC2_DOUBLE)
     
     # setup output iterator
-    out=minc2_output_iterator(files=["output_Intercept.mnc","output_group.mnc","output_visit.mnc",
-                                     "output_Intercept_t.mnc","output_group_t.mnc","output_visit_t.mnc" ])
-        for signal,mask in zip(inp_singnal,inp_mask):
-            
-            res=run_nlme(signal,mask)
+    out=minc2_output_iterator(files=["output_Count.mnc",
+                                     "output_Intercept.mnc","output_group.mnc","output_visit.mnc",
+                                     "output_Intercept_t.mnc","output_group_t.mnc","output_visit_t.mnc" ],
+                              reference=data['signal'][0],data_type=minc2_file.MINC2_DOUBLE)
+    try:
+      for signal,mask in zip(inp_signal,inp_mask):
+            res=run_lme(signal,mask)
             out.next(res)
+
     except StopIteration:
         print("Stopped early?")
         pass
     # delete input iterator, free memory, close files, usually done automatically
-    inp.close()
+    inp_signal.close()
+    inp_mask.close()
     # free up memory, close file not really needed here, usually done automatically
     out.close()
 # kate: space-indent on; indent-width 4; indent-mode python;replace-tabs on;word-wrap-column 80;show-tabs on;hl python

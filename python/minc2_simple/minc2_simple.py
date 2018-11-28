@@ -1029,6 +1029,9 @@ class minc2_input_iterator:
         lib.minc2_iterator_get_values(self._i,ffi.cast("void *", self._val.ctypes.data))
         return self._val
 
+    def __del__(self):
+        self.close()
+
 
 class minc2_output_iterator:
     """
@@ -1036,14 +1039,17 @@ class minc2_output_iterator:
     and write a vector of values
     doesn't quite follow python semantics
     """
-    def __init__(self,files=None, reference=None, data_type=None, store_type=None):
-        self._i = ffi.gc(lib.minc2_iterator_allocate0(),lib.minc2_iterator_free)
+    def __init__(self,files=None, reference=None, data_type=None, store_type=None,slice_scaling=None, global_scaling=None,):
+        self._i = ffi.gc(lib.minc2_iterator_allocate0(), lib.minc2_iterator_free)
         self._handles=[]
         self._last=False
+        
         if files is not None:
-            self.open(files, reference=reference, data_type=data_type, store_type=store_type)
+            self.open(files, reference=reference, 
+                      data_type=data_type, store_type=store_type,
+                      slice_scaling=slice_scaling, global_scaling=global_scaling)
 
-    def open(self,files,reference=None, data_type=None, store_type=None):
+    def open(self,files,reference=None, data_type=None, store_type=None,slice_scaling=None, global_scaling=None,):
         self._handles=[]
 
         if isinstance(files, six.string_types):
@@ -1057,7 +1063,7 @@ class minc2_output_iterator:
         _dims = None
 
         if isinstance(reference, minc2_input_iterator ):
-            reference = minc2_file(handle=reference._h[0])
+            reference = minc2_file(handle=reference._handles[0])
 
         elif isinstance(reference, six.string_types):
             reference = minc2_file(reference)
@@ -1082,7 +1088,7 @@ class minc2_output_iterator:
         elif data_type is None:
             store_type=data_type
 
-        # create volumes
+        # create dimensions for all volumes
         __dims = ffi.new("struct minc2_dimension[]", len(_dims)+1)
         for i,j in enumerate(_dims):
             if isinstance(j, minc2_dim):
@@ -1095,23 +1101,30 @@ class minc2_output_iterator:
                     ffi.memmove(__dims[i].dir_cos, ffi.cast("double [3]", j.dir_cos.ctypes.data ), 3*ffi.sizeof('double'))
             else:
                 __dims[i]=j
-        __dims[len(_dims)]={'id':lib.MINC2_DIM_END}
+        __dims[len(_dims)]={ 'id': lib.MINC2_DIM_END }
 
         for f,h in zip(files,self._handles):
             if lib.minc2_define(h, __dims, store_type, data_type)!=lib.MINC2_SUCCESS:
-                raise minc2_error("Error defining new minc file")
-            _global_scaling=0
-            _slice_scaling=0
-            if lib.minc2_set_scaling(h,_global_scaling,_slice_scaling )!=lib.MINC2_SUCCESS:
-                raise minc2_error()
+                raise minc2_error("Error defining new minc file ")
+
+            if slice_scaling is not None or global_scaling is not None:
+                _slice_scaling=0
+                _global_scaling=0
+
+                if slice_scaling: _slice_scaling=1
+                if global_scaling: _global_scaling=1
+
+                if lib.minc2_set_scaling(self._v,_global_scaling,_slice_scaling )!=lib.MINC2_SUCCESS:
+                    raise minc2_error()
+
             if lib.minc2_create(h, to_bytes(f) )!=lib.MINC2_SUCCESS:
                 raise minc2_error("Error creating file:"+f)
 
         self._dtype = minc2_file.minc2_to_numpy[data_type]
         import numpy as np
-        self._val =  np.empty(len(self._handles), self._dtype, 'C')
+        self._val =  np.empty( len(self._handles), self._dtype, 'C')
 
-        lib.minc2_multi_iterator_output_start(self._i,self._handles,data_type,len(self._handles))
+        lib.minc2_multi_iterator_output_start(self._i, self._handles, data_type, len(self._handles))
         self._last=False
 
     def close(self):
@@ -1119,6 +1132,9 @@ class minc2_output_iterator:
         for i in self._handles:
             lib.minc2_close(i)
         self._handles=[]
+
+    def __del__(self):
+        self.close()
 
     def dim(self):
         return len(self._handles)
