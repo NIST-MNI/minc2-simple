@@ -16,3 +16,5 @@ TARGET_LINK_LIBRARIES(minc2-simple ${LIBMINC_LIBRARIES})
 TARGET_LINK_LIBRARIES(minc2-simple-static ${LIBMINC_LIBRARIES})
 
 set_target_properties(minc2-simple minc2-simple-static PROPERTIES MACOSX_RPATH ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX})
+
+INSTALL(TARGETS minc2-simple minc2-simple-static DESTINATION lib)
