@@ -15,6 +15,7 @@ To provide access to most functionality of MINC2 file format with minimal effort
  * Installation:
     ```
     mkdir build
+    cd build
     cmake .. 
     make 
     ```
