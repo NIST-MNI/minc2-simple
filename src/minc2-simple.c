@@ -1034,7 +1034,7 @@ int minc2_world_to_voxel(minc2_file_handle h,const double *world,double *voxel)
 }
 
 
-int minc2_voxel_to_world(minc2_file_handle h,const double *voxel,double *world)
+int minc2_voxel_to_world(minc2_file_handle h, const double *voxel, double *world)
 {
   if(!h->vol)
     return MINC2_ERROR;
@@ -1044,6 +1044,43 @@ int minc2_voxel_to_world(minc2_file_handle h,const double *voxel,double *world)
 
   return MINC2_SUCCESS;
 }
+
+
+int minc2_world_to_voxel_vec(minc2_file_handle h,int n,int stride, const double *world,double *voxel)
+{
+  int i;
+  int ret=MINC2_SUCCESS;
+  if(!h->vol)
+    return MINC2_ERROR;
+
+  for(i=0;i<n;i++ ) {
+    const double* in_world=&world[i*stride];
+    double *out_voxel=&voxel[i*stride];
+
+    ret = ret || minc2_world_to_voxel(h, in_world, out_voxel);
+  }
+
+  return ret;
+}
+
+
+int minc2_voxel_to_world_vec(minc2_file_handle h, int n,int stride, const double *voxel, double *world)
+{
+  int i;
+  int ret=MINC2_SUCCESS;
+  if(!h->vol)
+    return MINC2_ERROR;
+
+  for(i=0;i<n;i++ ) {
+    const double* in_voxel=&voxel[i*stride];
+    double *out_world=&voxel[i*stride];
+
+    ret =  ret || minc2_voxel_to_world(h, in_voxel, out_world);
+  }
+
+  return ret;
+}
+
 
 
 static int _minc2_cleanup_dimensions(minc2_file_handle h)
@@ -1509,10 +1546,40 @@ int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* o
   return general_transform_point(&h->xfm,in[0],in[1],in[2],&out[0],&out[1],&out[2])==VIO_OK?MINC2_SUCCESS:MINC2_ERROR;
 }
 
+int minc2_xfm_transform_point_vec(minc2_xfm_file_handle h,int n,int stride,const double* in,double* out)
+{
+    int i;
+    int ret=MINC2_SUCCESS;
+    for(i=0;i<n;i++)
+    {
+        double *pnt_in=&in[i*stride];
+        double *pnt_out=&out[i*stride];
+        ret = ret ||  minc2_xfm_transform_point(h,pnt_in,pnt_out);
+    }
+
+    return ret;
+}
+
+
 int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,double* out)
 {
   return general_inverse_transform_point(&h->xfm,in[0],in[1],in[2],&out[0],&out[1],&out[2])==VIO_OK?MINC2_SUCCESS:MINC2_ERROR;
 }
+
+int minc2_xfm_inverse_transform_point_vec(minc2_xfm_file_handle h,int n,int stride,const double* in,double* out)
+{
+    int i;
+    int ret=MINC2_SUCCESS;
+    for(i=0;i<n;i++)
+    {
+        double *pnt_in=&in[i*stride];
+        double *pnt_out=&out[i*stride];
+        ret = ret || minc2_xfm_inverse_transform_point(h,pnt_in,pnt_out);
+    }
+
+    return ret;
+}
+
 
 int minc2_xfm_invert(minc2_xfm_file_handle h)
 {

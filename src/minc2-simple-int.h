@@ -254,10 +254,25 @@ int minc2_set_slice_range(minc2_file_handle h,int *start,double value_min,double
  */
 int minc2_world_to_voxel(minc2_file_handle h,const double *world,double *voxel);
 
+
+/**
+ * convert world X,Y,Z coordinates to voxel indexes (also in X,Y,Z order)
+ * vectorized version
+ */
+int minc2_world_to_voxel_vec(minc2_file_handle h, int n, int stride, const double *world,double *voxel);
+
+
 /**
  * convert voxel X,Y,Z indexes to world coordinates (also in X,Y,Z order)
  */
 int minc2_voxel_to_world(minc2_file_handle h,const double *voxel,double *world);
+
+
+/**
+ * convert voxel X,Y,Z indexes to world coordinates (also in X,Y,Z order)
+ * vectorized version
+ */
+int minc2_voxel_to_world_vec(minc2_file_handle h,int n, int stride, const double *voxel,double *world);
 
 
 /**
@@ -415,6 +430,19 @@ int minc2_xfm_transform_point(minc2_xfm_file_handle h,const double* in,double* o
  * invert transform x,y,z coordinates
  */
 int minc2_xfm_inverse_transform_point(minc2_xfm_file_handle h,const double* in,double* out);
+
+
+/**
+ * transform x,y,z coordinates for n points separated by stride
+ */
+int minc2_xfm_transform_point_vec(minc2_xfm_file_handle h,int n,int stride,const double* in,double* out);
+
+/**
+ * invert transform x,y,z coordinates for n points separated by stride
+ */
+int minc2_xfm_inverse_transform_point_vec(minc2_xfm_file_handle h,int n,int stride,const double* in,double* out);
+
+
 
 /**
  * set flag to invert transform

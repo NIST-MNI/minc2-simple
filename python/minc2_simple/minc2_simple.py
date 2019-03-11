@@ -291,7 +291,7 @@ class minc2_file:
     def setup_standard_order(self):
         if lib.minc2_setup_standard_order(self._v)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error setting up standard volume order")
-    
+
     def save_complete_volume(self, buf):
         import numpy as np
         data_type=lib.MINC2_FLOAT
@@ -320,6 +320,47 @@ class minc2_file:
         if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.storage().data_ptr()),data_type)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error saving volume")
         return buf
+
+    def world_to_voxel(self, xyz):
+        """
+        Convert world coordinates (X,Y,Z) to voxel coordinates (i,j,k)
+
+        :param xyz: - numpy array either length of 3 or 2D array with each row being X,Y,Z
+        :return:    - either 1D array of (i,j,k) or 2D array with each row (i,j,k)
+        """
+        import numpy as np
+        in_xyz=np.asarray(xyz,dtype=np.float64,order="C")
+        if len(in_xyz.shape)==1: # single 3D array
+            out_ijk = np.empty(3, np.float64, 'C')
+            if lib.minc2_world_to_voxel(self._v, ffi.cast("double *", in_xyz.ctypes.data), ffi.cast("double *", out_ijk.ctypes.data))!=lib.MINC2_SUCCESS:
+                raise minc2_error("Error world_to_voxel")
+            return out_ijk
+        else:
+            out_ijk = np.empty(in_xyz.shape, np.float64, 'C')
+            if lib.minc2_world_to_voxel_vec(self._v, in_xyz.shape[1], 3, ffi.cast("double *", in_xyz.ctypes.data), ffi.cast("double *", out_ijk.ctypes.data))!=lib.MINC2_SUCCESS:
+                raise minc2_error("Error world_to_voxel_vec")
+            return out_ijk
+
+    def voxel_to_world(self, ijk):
+        """
+        Convert voxel coordinates (i,j,k) to world coordinates (X,Y,Z)
+
+        :param ijk: - numpy array either length of 3 or 2D array with each row being i,j,k
+        :return:    - either 1D array of (X,Y,Z) or 2D array with each row (X,Y,Z)
+        """
+        import numpy as np
+        in_ijk=np.asarray(ijk, dtype=np.float64, order="C")
+        if len(in_ijk.shape)==1: # single 3D array
+            out_xyz = np.empty(3, np.float64, 'C')
+            if lib.minc2_voxel_to_world(self._v, ffi.cast("double *", in_ijk.ctypes.data), ffi.cast("double *", out_xyz.ctypes.data)) != lib.MINC2_SUCCESS:
+                raise minc2_error("Error in voxel_to_world")
+            return out_xyz
+        else:
+            out_xyz = np.empty(in_ijk.shape, np.float64, 'C')
+            if lib.minc2_world_to_voxel_vec(self._v, in_ijk.shape[1], 3, ffi.cast("double *", in_ijk.ctypes.data), ffi.cast("double *", out_xyz.ctypes.data)) != lib.MINC2_SUCCESS:
+                raise minc2_error("Error in voxel_to_world_vec")
+            return out_xyz
+
 
     def read_attribute(self, group, attribute):
         import numpy as np
@@ -740,18 +781,33 @@ class minc2_xfm:
         assert(lib.minc2_xfm_save(self._v,to_bytes(path)) == lib.MINC2_SUCCESS)
 
     def transform_point(self, xyz_in):
+        """
+        Apply transformation to coordinates
+        :param xyz_in:  either 1d array or 2d array
+        :return:  1d or 3d array
+        """
         import numpy as np
         _xyz_in=np.asarray(xyz_in,'float64','C')
-        xyz_out=np.empty([3],'float64','C')
-        assert(lib.minc2_xfm_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
-        return xyz_out
+        if len(_xyz_in.shape)==1:
+            xyz_out=np.empty([3],'float64','C')
+            assert(lib.minc2_xfm_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+            return xyz_out
+        else:
+            xyz_out=np.empty(_xyz_in.shape,'float64','C')
+            assert(lib.minc2_xfm_transform_point_vec(self._v,_xyz_in.shape[0], 3, ffi.cast("double *", _xyz_in.ctypes.data), ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+            return xyz_out
 
     def inverse_transform_point(self,xyz_in):
         import numpy as np
         _xyz_in=np.asarray(xyz_in,'float64','C')
-        xyz_out=np.empty([3],'float64','C')
-        assert(lib.minc2_xfm_inverse_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
-        return xyz_out
+        if len(_xyz_in.shape)==1:
+            xyz_out=np.empty([3],'float64','C')
+            assert(lib.minc2_xfm_inverse_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+            return xyz_out
+        else:
+            xyz_out=np.empty(_xyz_in.shape,'float64','C')
+            assert(lib.minc2_xfm_inverse_transform_point_vec(self._v,_xyz_in.shape[0], 3, ffi.cast("double *", _xyz_in.ctypes.data), ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
+            return xyz_out
 
     def invert(self):
         assert(lib.minc2_xfm_invert(self._v)==lib.MINC2_SUCCESS)
