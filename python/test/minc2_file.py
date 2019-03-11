@@ -48,12 +48,13 @@ def setUpModule():
                         '-dimorder', 'vector_dimension,xspace,yspace,zspace'])
 
     input3DdirectionCosines = tempfile.NamedTemporaryFile(prefix="test-3d-direction-cosines", suffix=".mnc").name
-    subprocess.check_call(['rawtominc', input3DdirectionCosines, '-input', '/dev/urandom', '100', '150', '125',
-                        '-xdircos',  '0.9305326623',   '0.1308213523', '0.34202943789', 
+    subprocess.check_call(['rawtominc', input3DdirectionCosines, '-input', '/dev/urandom',
+                           '100', '150', '125',
+                        '-xstep', '1.0', '-ystep', '1.2', '-zstep', '0.9',
+                        '-xstart', '-50.0', '-ystart', '-100.0', '-zstart', '-20.0',
+                        '-xdircos',  '0.9305326623',   '0.1308213523', '0.34202943789',
                         '-ydircos', '-0.1958356912',  '0.96692346178', '0.16316734231',
                         '-zdircos', '-9.3093890238', '-0.21882376893', '0.92542348732'])
-
-
 
 
 def tearDownModule():
@@ -575,7 +576,7 @@ class testVectorFiles(unittest.TestCase):
         v.close()
         
 class testDirectionCosines(unittest.TestCase):
-    """test that pyminc deals correctly with direction cosines"""
+    """test that minc2_simple deals correctly with direction cosines"""
     def testDefaultDirCos3DVFF(self):
         """testing reading the direction cosines of a file with standard values (volumeFromFile)"""
         v = minc2_file(inputFile_ushort)
@@ -626,7 +627,62 @@ class testDirectionCosines(unittest.TestCase):
         self.assertAlmostEqual(dims[2].dir_cos[0], float(from_file[0]), 8)
         self.assertAlmostEqual(dims[2].dir_cos[1], float(from_file[1]), 8)
         self.assertAlmostEqual(dims[2].dir_cos[2], float(from_file[2]), 8)
-        
-        
+
+
+class testWorlToVoxel(unittest.TestCase):
+    """test that minc2_simple deals correctly with converting between coordinate systems"""
+
+
+    def testWorldToVoxel(self):
+        """testing world_to_voxel conversion of a file with non-standard values"""
+        v = minc2_file(input3DdirectionCosines)
+        v.setup_standard_order()
+        xyz=N.array([50.0,-80.0,-30.0])
+        ijk=v.world_to_voxel(xyz)
+        self.assertAlmostEqual(ijk[0], 14.669193158950601941 , 8)
+        self.assertAlmostEqual(ijk[1], 16.613302579048678354,  8)
+        self.assertAlmostEqual(ijk[2], 18.875812259773908863 , 8)
+
+
+    def testVoxelToWorld(self):
+        """testing voxel_to_world conversion of a file with non-standard values"""
+        v = minc2_file(input3DdirectionCosines)
+        v.setup_standard_order()
+
+
+        ijk=N.array([0,0,0])
+        xyz=v.voxel_to_world(ijk)
+        ijk2 = v.world_to_voxel(xyz)
+        print("{}: {} - {} - {}".format(input3DdirectionCosines, ijk, xyz, ijk2 ))
+        self.assertAlmostEqual(xyz[0], 159.24471648100001175, 8)
+        self.assertAlmostEqual(xyz[1], -98.856938414399991188, 8)
+        self.assertAlmostEqual(xyz[2], -51.926675871900002335, 8)
+
+
+        ijk=N.array([10,20,30])
+        xyz=v.voxel_to_world(ijk)
+        print("{}: {} - {}".format(input3DdirectionCosines,ijk,xyz))
+        #subprocess.check_call(['cp',input3DdirectionCosines,'.','-v'])
+        self.assertAlmostEqual(xyz[0],  98.676138547000007861, 8)
+        self.assertAlmostEqual(xyz[1], -73.695548683049992178, 8)
+        self.assertAlmostEqual(xyz[2], -29.420965133880002895, 8)
+
+    def testWorldToVoxelVec(self):
+        """Compare against binary world to voxel"""
+        v = minc2_file(input3DdirectionCosines)
+        v.setup_standard_order()
+
+        x,y,z=N.meshgrid( N.linspace(-10,10,4),N.linspace(0,20,4),N.linspace(-5,15,4) )
+        xyz=N.column_stack( ( N.ravel(x), N.ravel(y), N.ravel(z)))
+
+        ijk=v.world_to_voxel(xyz)
+
+        for i,x in enumerate(xyz):
+            pipe = os.popen("worldtovoxel {} {} {} {}".format(input3DdirectionCosines,x[0], x[1], x[2]), "r")
+            from_file = [float(i) for i in pipe.read().rstrip().split(" ")]
+            pipe.close()
+            for k in range(3):
+                self.assertAlmostEqual(from_file[k], ijk[i,k] , 8)
+
 if __name__ == "__main__":
     unittest.main()

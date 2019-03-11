@@ -1027,7 +1027,7 @@ int minc2_world_to_voxel(minc2_file_handle h,const double *world,double *voxel)
   if(!h->vol)
     return MINC2_ERROR;
 
-  if(miconvert_world_to_voxel(h->vol,world,voxel)<0)
+  if(miconvert_world_to_voxel(h->vol, world, voxel)<0)
     return MINC2_ERROR;
 
   return MINC2_SUCCESS;
