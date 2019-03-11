@@ -97,8 +97,16 @@ class minc2_file:
         }
     __torch_to_minc2 = {y:x for x,y in six.iteritems(__minc2_to_torch)}
     
-    def __init__(self, path=None, standard=False):
-        self._v = ffi.gc(lib.minc2_allocate0(), lib.minc2_destroy)
+    minc2_to_numpy=__minc2_to_numpy
+    numpy_to_minc2=__numpy_to_minc2
+
+    def __init__(self, path=None, standard=False, handle=None):
+
+        if handle is None:
+            self._v = ffi.gc(lib.minc2_allocate0(), lib.minc2_destroy)
+        else:
+            self._v = handle
+
         if path is not None:
             self.open(path)
             if standard:
@@ -232,7 +240,7 @@ class minc2_file:
         shape=list(range(self.ndim()))
         # numpy array  defines dimensions in a slowest first fashion
         for i in range(self.ndim()):
-            shape[self.ndim()-i-1]=_dims[i].length
+            shape[self.ndim()-i-1] = _dims[i].length
 
         dtype=None
         
@@ -945,5 +953,213 @@ class minc2_tags:
         else: # it's empty
             pass
         assert lib.minc2_tags_save(_t,to_bytes(path))==lib.MINC2_SUCCESS
+
+class minc2_input_iterator:
+    """
+    minc2 input file iterator, can work with multiple input files
+    and return a vector of values
+    """
+    def __init__(self, files=None, data_type=None):
+        self._i = ffi.gc(lib.minc2_iterator_allocate0(),lib.minc2_iterator_free)
+        self._handles=[]
+        self._dtype=None
+        self._last=False
+        if files is not None:
+            self.open(files,data_type=data_type)
+    
+    def open(self,files,data_type=None):
+
+        if isinstance(files, six.string_types):
+            files=(files,)
+
+        for f in files:
+            _h=ffi.gc(lib.minc2_allocate0(), lib.minc2_destroy)
+            if lib.minc2_open(_h, to_bytes(f))!=lib.MINC2_SUCCESS:
+                raise minc2_error("Can't open file:"+f)
+            self._handles+=[_h]
+
+        if data_type is None:
+            _dtype = ffi.new("int*",0)
+            if lib.minc2_data_type(self._handles[0],_dtype)!=lib.MINC2_SUCCESS:
+                raise minc2_error("Error getting representation type")
+            data_type=_dtype[0]
+        
+        import numpy as np
+        self._dtype = minc2_file.minc2_to_numpy[data_type]
+        self._val =  np.empty(len(self._handles), self._dtype, 'C')
+        lib.minc2_multi_iterator_input_start(self._i,self._handles,data_type,len(self._handles))
+        self._last=False
+
+    def close(self):
+        # close all input files
+        for i in self._handles:
+            lib.minc2_close(i)
+        self._handles=[]
+
+    def dim(self):
+        return len(self._handles)
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        """
+        read and advance
+        """
+        # minc2_iterator_get_values(input_minc_it,&voxels[0]);
+        #_val= np.empty(shape, dtype, 'C')
+        if self._last:
+            raise StopIteration()
+
+        lib.minc2_iterator_get_values(self._i,ffi.cast("void *", self._val.ctypes.data))
+
+        self._last=lib.minc2_iterator_next(self._i)!=lib.MINC2_SUCCESS
+
+        return self._val
+            
+
+    def __next__(self):
+        return self.next()
+
+    def val(self):
+        """
+        read the curent value without advancing
+        """
+        # TODO: make sure we can read
+        lib.minc2_iterator_get_values(self._i,ffi.cast("void *", self._val.ctypes.data))
+        return self._val
+
+    def __del__(self):
+        self.close()
+
+
+class minc2_output_iterator:
+    """
+    minc2 output file iterator, can work with multiple output files
+    and write a vector of values
+    doesn't quite follow python semantics
+    """
+    def __init__(self,files=None, reference=None, data_type=None, store_type=None,slice_scaling=None, global_scaling=None,):
+        self._i = ffi.gc(lib.minc2_iterator_allocate0(), lib.minc2_iterator_free)
+        self._handles=[]
+        self._last=False
+        
+        if files is not None:
+            self.open(files, reference=reference, 
+                      data_type=data_type, store_type=store_type,
+                      slice_scaling=slice_scaling, global_scaling=global_scaling)
+
+    def open(self,files,reference=None, data_type=None, store_type=None,slice_scaling=None, global_scaling=None,):
+        self._handles=[]
+
+        if isinstance(files, six.string_types):
+            files=(files,)
+
+        for f in files:
+            _h=ffi.gc(lib.minc2_allocate0(), lib.minc2_destroy)
+            self._handles+=[_h]
+
+        _ref=None
+        _dims = None
+
+        if isinstance(reference, minc2_input_iterator ):
+            reference = minc2_file(handle=reference._handles[0])
+
+        elif isinstance(reference, six.string_types):
+            reference = minc2_file(reference)
+
+        if isinstance(reference, minc2_file ):
+            if store_type is None:
+                store_type = minc2_file.numpy_to_minc2[reference.store_dtype()]
+            if data_type is None:
+                data_type = minc2_file.numpy_to_minc2[reference.representation_dtype()]
+            _dims=reference.store_dims()
+
+        elif isinstance(reference,list) or isinstance(reference,tuple):
+            # assume it's dimensions definition
+            _dims=reference
+            reference=None
+        
+        # default
+        if data_type is None and store_type is None:
+            data_type=store_type=lib.MINC2_FLOAT
+        elif store_type is None:
+            data_type=store_type
+        elif data_type is None:
+            store_type=data_type
+
+        # create dimensions for all volumes
+        __dims = ffi.new("struct minc2_dimension[]", len(_dims)+1)
+        for i,j in enumerate(_dims):
+            if isinstance(j, minc2_dim):
+                __dims[i].id=j.id
+                __dims[i].length=j.length
+                __dims[i].start=j.start
+                __dims[i].step=j.step
+                __dims[i].have_dir_cos=j.have_dir_cos
+                if j.have_dir_cos: 
+                    ffi.memmove(__dims[i].dir_cos, ffi.cast("double [3]", j.dir_cos.ctypes.data ), 3*ffi.sizeof('double'))
+            else:
+                __dims[i]=j
+        __dims[len(_dims)]={ 'id': lib.MINC2_DIM_END }
+
+        for f,h in zip(files,self._handles):
+            if lib.minc2_define(h, __dims, store_type, data_type)!=lib.MINC2_SUCCESS:
+                raise minc2_error("Error defining new minc file ")
+
+            if slice_scaling is not None or global_scaling is not None:
+                _slice_scaling=0
+                _global_scaling=0
+
+                if slice_scaling: _slice_scaling=1
+                if global_scaling: _global_scaling=1
+
+                if lib.minc2_set_scaling(self._v,_global_scaling,_slice_scaling )!=lib.MINC2_SUCCESS:
+                    raise minc2_error()
+
+            if lib.minc2_create(h, to_bytes(f) )!=lib.MINC2_SUCCESS:
+                raise minc2_error("Error creating file:"+f)
+
+        self._dtype = minc2_file.minc2_to_numpy[data_type]
+        import numpy as np
+        self._val =  np.empty( len(self._handles), self._dtype, 'C')
+
+        lib.minc2_multi_iterator_output_start(self._i, self._handles, data_type, len(self._handles))
+        self._last=False
+
+    def close(self):
+        # close all input files
+        for i in self._handles:
+            lib.minc2_close(i)
+        self._handles=[]
+
+    def __del__(self):
+        self.close()
+
+    def dim(self):
+        return len(self._handles)
+
+    def __iter__(self):
+        return self
+
+    def next(self, value=None):
+        """
+        write value and adance
+        """
+        if self._last:
+            raise StopIteration()
+
+        if value is not None:
+            self.set_value(value)
+
+        self._last=lib.minc2_iterator_next(self._i)!=lib.MINC2_SUCCESS
+            
+    def __next__(self):
+        return self.next()
+
+    def set_value(self,v):
+        self._val[:]=v
+        lib.minc2_iterator_put_values(self._i,ffi.cast("void *", self._val.ctypes.data))
+        return v
 
 # kate: indent-width 4; replace-tabs on; remove-trailing-space on; hl python; show-tabs on

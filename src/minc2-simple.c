@@ -7,7 +7,7 @@
 #include <string.h>
 #include <limits.h>
 #include <time.h>
-
+#include <float.h>
 /**
  * internal functions
  */
@@ -1800,6 +1800,9 @@ struct minc2_file_iterator
   int _buffer_size;             /*< slice buffer size in elements */
   int _buffer_index;            /*< current buffer index */
   int _element_size;            /*< size of one element */
+
+  double *_min;                 /*buffer to keep volume range*/
+  double *_max;                 /*buffer to keep volume range*/
 };
 
 
@@ -1818,6 +1821,9 @@ int minc2_iterator_free(minc2_file_iterator_handle h)
   if(h->_start) free(h->_start);
   if(h->_end)   free(h->_end);
   if(h->_buffer)free(h->_buffer);
+
+  if(h->_min)   free(h->_min);
+  if(h->_max)   free(h->_max);
 
   free(h);
 
@@ -1850,6 +1856,9 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle *
   h->_end=  (int*)realloc(h->_end,  sizeof(int)*h->_ndim);
   h->_count=(int*)realloc(h->_count,sizeof(int)*h->_ndim);
 
+  /**/
+  h->_min=(double*)realloc(h->_min,sizeof(double)*fnumber);
+  h->_max=(double*)realloc(h->_max,sizeof(double)*fnumber);
 
   /*for now use the whole volume */
   for ( i = 0; i < h->_ndim ; i++ )
@@ -1862,6 +1871,13 @@ static int minc2_iterator_start(minc2_file_iterator_handle h,minc2_file_handle *
       h->_end[i]=h->_minc_file[0]->representation_dims[i].length;
     else
       h->_end[i]=h->_minc_file[0]->store_dims[i].length;
+   
+  }
+
+  for(i=0;i<fnumber;i++)
+  {
+    h->_min[i]=DBL_MAX;
+    h->_max[i]=-DBL_MAX;
   }
 
   minc2_slice_ndim(h->_minc_file[0],&h->_slice_dimensions);
@@ -1886,51 +1902,54 @@ static int minc2_iterator_flush(minc2_file_iterator_handle h)
 {
   int i,f;
   int r=1;
+
   for(f=0;f< h->_fnum; f++)
   {
     void *f_buffer=h->_buffer + h->_buffer_size*h->_element_size*f;
 
     if(h->_output_mode)
     {
-      if( h->_minc_file[f]->slice_scaling_flag )
+      double buffer_min,buffer_max;
+      switch(h->_data_type )
       {
-        double buffer_min,buffer_max;
-        switch(h->_data_type )
-        {
-          case MINC2_UBYTE:
-            _GET_BUFFER_MIN_MAX(unsigned char,f_buffer,h->_buffer_size,buffer_min,buffer_max);
-            break;
-          case MINC2_BYTE:
-            _GET_BUFFER_MIN_MAX(char,f_buffer, h->_buffer_size,buffer_min,buffer_max);
-            break;
-          case MINC2_USHORT:
-            _GET_BUFFER_MIN_MAX(unsigned short,f_buffer,h->_buffer_size,buffer_min,buffer_max);
-            break;
-          case MINC2_SHORT:
-            _GET_BUFFER_MIN_MAX(short,f_buffer,h->_buffer_size,buffer_min,buffer_max);
-            break;
-          case MINC2_UINT:
-            _GET_BUFFER_MIN_MAX(unsigned int,f_buffer,h->_buffer_size,buffer_min,buffer_max);
-            break;
-          case MINC2_INT:
-            _GET_BUFFER_MIN_MAX(int,f_buffer,h->_buffer_size,buffer_min,buffer_max);
-            break;
-          case MINC2_FLOAT:
-            _GET_BUFFER_MIN_MAX_PROT(float,f_buffer,h->_buffer_size,buffer_min,buffer_max);
-            break;
-          case MINC2_DOUBLE:
-            _GET_BUFFER_MIN_MAX_PROT(double,f_buffer,h->_buffer_size,buffer_min,buffer_max);
-            break;
-          default:
-            MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
-            return MINC2_ERROR;
-        }
-
-        if ( minc2_set_slice_range(h->_minc_file[f],h->_index,buffer_min,buffer_max)!=MINC2_SUCCESS )
+        case MINC2_UBYTE:
+          _GET_BUFFER_MIN_MAX(unsigned char,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_BYTE:
+          _GET_BUFFER_MIN_MAX(char,f_buffer, h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_USHORT:
+          _GET_BUFFER_MIN_MAX(unsigned short,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_SHORT:
+          _GET_BUFFER_MIN_MAX(short,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_UINT:
+          _GET_BUFFER_MIN_MAX(unsigned int,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_INT:
+          _GET_BUFFER_MIN_MAX(int,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_FLOAT:
+          _GET_BUFFER_MIN_MAX_PROT(float,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        case MINC2_DOUBLE:
+          _GET_BUFFER_MIN_MAX_PROT(double,f_buffer,h->_buffer_size,buffer_min,buffer_max);
+          break;
+        default:
+          MI_LOG_ERROR(MI2_MSG_GENERIC,"Unsupported volume data type");
           return MINC2_ERROR;
       }
 
+      if( h->_minc_file[f]->slice_scaling_flag )
+        if ( minc2_set_slice_range(h->_minc_file[f],h->_index,buffer_min,buffer_max)!=MINC2_SUCCESS )
+          return MINC2_ERROR;
+
       r=minc2_write_hyperslab(h->_minc_file[f], h->_index,h->_count, f_buffer, h->_data_type)==MINC2_SUCCESS&&r;
+
+      if(isfinite(buffer_min) && buffer_min<h->_min[f]) h->_min[f]=buffer_min;
+      if(isfinite(buffer_max) && buffer_max>h->_max[f]) h->_max[f]=buffer_max;
+
     } else {
       r=minc2_read_hyperslab( h->_minc_file[f], h->_index,h->_count, f_buffer, h->_data_type)==MINC2_SUCCESS&&r;
     }
@@ -1985,10 +2004,18 @@ int minc2_iterator_next(minc2_file_iterator_handle h)
   do {
     if( i == h->_slice_dimensions && h->_output_mode ) /*write last slice*/
     {
+      int f;
+      int r=1;
       h->_buffer_index=0;
       
       if(minc2_iterator_flush(h)!=MINC2_SUCCESS) 
         return MINC2_ERROR; /*I/O error, report somehow?*/
+      
+      for(f=0;f<h->_fnum;f++)
+        r = r && ( minc2_set_volume_range(h->_minc_file[f], h->_min[f], h->_max[f] )==MINC2_SUCCESS);
+
+      if(!r)
+        return MINC2_ERROR;
     }
     
     h->_index[i]++;

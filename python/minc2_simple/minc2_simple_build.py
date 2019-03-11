@@ -5,14 +5,14 @@ from sys import platform
   
 ffi = FFI()
 
-minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.16")
+minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.17")
 source_path=os.path.join(os.path.dirname(__file__), "../../src")
 
 _extra_link_args_debug=['-g']
 _extra_compile_args_debug=['-fsanitize=address','-fno-omit-frame-pointer','-g']
 
-_extra_link_args=[]
-_extra_compile_args=[]
+_extra_link_args = []
+_extra_compile_args = []
 
 minc2_simple_src=""
 minc2_simple_defs=""
