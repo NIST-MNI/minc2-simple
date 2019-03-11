@@ -731,16 +731,13 @@ class minc2_xfm:
         if path is not None:
             self.open(path)
 
-
     def open(self, path):
         assert path is not None,"Provide minc2 file"
         assert lib.minc2_xfm_open(self._v,to_bytes(path)) == lib.MINC2_SUCCESS
 
-
     def save(self, path):
         assert path is not None,"Provide minc2 file"
         assert(lib.minc2_xfm_save(self._v,to_bytes(path)) == lib.MINC2_SUCCESS)
-
 
     def transform_point(self, xyz_in):
         import numpy as np
@@ -749,14 +746,12 @@ class minc2_xfm:
         assert(lib.minc2_xfm_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
         return xyz_out
 
-
     def inverse_transform_point(self,xyz_in):
         import numpy as np
         _xyz_in=np.asarray(xyz_in,'float64','C')
         xyz_out=np.empty([3],'float64','C')
         assert(lib.minc2_xfm_inverse_transform_point(self._v,ffi.cast("double *", _xyz_in.ctypes.data),ffi.cast("double *", xyz_out.ctypes.data))==lib.MINC2_SUCCESS)
         return xyz_out
-
 
     def invert(self):
         assert(lib.minc2_xfm_invert(self._v)==lib.MINC2_SUCCESS)
