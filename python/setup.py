@@ -31,5 +31,6 @@ setup(
     cffi_modules=[
         "./minc2_simple/minc2_simple_build.py:ffi",
     ],
+    scripts=(['../example/python/xfmavg_scipy.py']),
     test_suite="test"
 )
