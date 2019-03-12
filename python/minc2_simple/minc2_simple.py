@@ -331,13 +331,13 @@ class minc2_file:
         import numpy as np
         in_xyz=np.asarray(xyz,dtype=np.float64,order="C")
         if len(in_xyz.shape)==1: # single 3D array
-            out_ijk = np.zeros(3, np.float64, 'C')
+            out_ijk = np.empty(3, np.float64, 'C')
             if lib.minc2_world_to_voxel(self._v, ffi.cast("double *", in_xyz.ctypes.data), ffi.cast("double *", out_ijk.ctypes.data))!=lib.MINC2_SUCCESS:
                 raise minc2_error("Error world_to_voxel")
             return out_ijk
         else:
-            out_ijk = np.zeros(in_xyz.shape, np.float64, 'C')
-            if lib.minc2_world_to_voxel_vec(self._v, in_xyz.shape[1], 3, ffi.cast("double *", in_xyz.ctypes.data), ffi.cast("double *", out_ijk.ctypes.data))!=lib.MINC2_SUCCESS:
+            out_ijk = np.empty(in_xyz.shape, np.float64, 'C')
+            if lib.minc2_world_to_voxel_vec(self._v, in_xyz.shape[0], 3, ffi.cast("double *", in_xyz.ctypes.data), ffi.cast("double *", out_ijk.ctypes.data))!=lib.MINC2_SUCCESS:
                 raise minc2_error("Error world_to_voxel_vec")
             return out_ijk
 
@@ -351,13 +351,13 @@ class minc2_file:
         import numpy as np
         in_ijk=np.asarray(ijk, dtype=np.float64, order="C")
         if len(in_ijk.shape)==1: # single 3D array
-            out_xyz = np.zeros(3, np.float64, 'C')
+            out_xyz = np.empty(3, np.float64, 'C')
             if lib.minc2_voxel_to_world(self._v, ffi.cast("double *", in_ijk.ctypes.data), ffi.cast("double *", out_xyz.ctypes.data)) != lib.MINC2_SUCCESS:
                 raise minc2_error("Error in voxel_to_world")
             return out_xyz
         else:
-            out_xyz = np.zeros(in_ijk.shape, np.float64, 'C')
-            if lib.minc2_world_to_voxel_vec(self._v, in_ijk.shape[1], 3, ffi.cast("double *", in_ijk.ctypes.data), ffi.cast("double *", out_xyz.ctypes.data)) != lib.MINC2_SUCCESS:
+            out_xyz = np.empty(in_ijk.shape, np.float64, 'C')
+            if lib.minc2_world_to_voxel_vec(self._v, in_ijk.shape[0], 3, ffi.cast("double *", in_ijk.ctypes.data), ffi.cast("double *", out_xyz.ctypes.data)) != lib.MINC2_SUCCESS:
                 raise minc2_error("Error in voxel_to_world_vec")
             return out_xyz
 
