@@ -8,11 +8,17 @@ import sys
 import collections
 
 class minc2_error(Exception):
-    def __init__(self,message=""):
+    """
+    minc2-generated error
+    """
+    def __init__(self, message=""):
         super(minc2_error, self).__init__(message)
     
 
 class minc2_transform_parameters(object):
+    """
+    parameters describing affine transformation
+    """
     def __init__(self):
         import numpy as np
         self.center=np.zeros(3)
@@ -32,14 +38,13 @@ class minc2_transform_parameters(object):
     def __repr__(self):
         return self.__str__()
 
+
 minc2_dim=collections.namedtuple('minc2_dim',['id','length', 'start', 'step', 'have_dir_cos', 'dir_cos'])
 
 
 class minc2_file:
     """
-    MINC2 file object (Volume)
-    Args:
-        path - path to minc file to open, (default None)
+    MINC2 file object (Volume on the disk, stored in .mnc file)
 
     """
     #: constants
@@ -101,6 +106,12 @@ class minc2_file:
     numpy_to_minc2=__numpy_to_minc2
 
     def __init__(self, path=None, standard=False, handle=None):
+        """
+
+        :param path: file path to open
+        :param standard: after opening, immedeately switch to standard orientation ( see @setup_standard_order)
+        :param handle: use library handle to already opened minc2 file
+        """
 
         if handle is None:
             self._v = ffi.gc(lib.minc2_allocate0(), lib.minc2_destroy)
@@ -113,47 +124,83 @@ class minc2_file:
                 self.setup_standard_order()
 
     def open(self, path):
+        """
+        Open existing minc2 file
+        :param path: file path
+        :return: None
+        """
         if lib.minc2_open(self._v, to_bytes(path))!=lib.MINC2_SUCCESS:
             raise minc2_error("Can't open file:"+path)
 
     def close(self):
+        """
+        Close opened file, flush data on disk, free resources
+        :return:
+        """
         if lib.minc2_close(self._v)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error closing file")
 
     def ndim(self):
+        """
+        Query number of dimensions
+        :return: integer number of dimensions
+        """
         dd=ffi.new("int*", 0)
         lib.minc2_ndim(self._v, dd)
         return dd[0]
 
     def store_dims_(self):
+        """
+        internal function to query dimension structure
+        :return: struct minc2_dimension
+        """
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_store_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error defining dimensions")
         return dims[0]
 
     def minc2_dim_to_python_(self,d):
+        """
+        internal function to convert dimension descriptions
+        :param d:  dimensions description in minc2 C library
+        :return:  dimensions description in python format
+        """
         import numpy as np
-        dd=minc2_dim(id=d.id,length=d.length, start=d.start, step=d.step, have_dir_cos=d.have_dir_cos, dir_cos=np.zeros(3,np.float64))
+        dd = minc2_dim(id=d.id,length=d.length, start=d.start, step=d.step, have_dir_cos=d.have_dir_cos, dir_cos=np.zeros(3,np.float64))
         if d.have_dir_cos:
             ffi.memmove(ffi.cast("double [3]", dd.dir_cos.ctypes.data), d.dir_cos, 3*ffi.sizeof('double'))
         return dd
 
     def store_dims(self):
+        """
+        Description of file dimensions (as stored on disk)
+        :return:  list of dimensions , in the order as stored on disk
+        """
         d_=self.store_dims_()
         return [ self.minc2_dim_to_python_(d_[j]) for j in range(self.ndim())]
 
     def representation_dims_(self):
+        """
+        internal function
+        :return:
+        """
         dims=ffi.new("struct minc2_dimension*[1]")
         if lib.minc2_get_representation_dimensions(self._v,dims)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error getting dimension information")
         return dims[0]
 
     def representation_dims(self):
+        """
+        Description of file dimensions (current memory representation)
+        :return:  list of dimensions , as visible to python
+        """
         d_ = self.representation_dims_()
         return [ self.minc2_dim_to_python_(d_[j]) for j in range(self.ndim() ) ]
 
     def imitate(self, another, store_type=None, representation_type=None, path=None):
         """
+        Generate new minc volume with the same parameters as another one
+
         :param another: another minc2_file object or path to a file
         :param store_type: data type for storage
         :param representation_type: preferred data type for representation
@@ -177,6 +224,16 @@ class minc2_file:
             self.create(path)
 
     def define(self, dims, store_type=None, representation_type=None, slice_scaling=None, global_scaling=None, path=None):
+        """
+        Define new minc2 volume
+        :param dims:  dimensions description (as will be stored on disk)
+        :param store_type:  data format as stored on disk
+        :param representation_type:  data format as visible to python
+        :param slice_scaling:  use slice scaling
+        :param global_scaling: use global scaling
+        :param path: output file path
+        :return:
+        """
         _dims = dims
         if store_type is None:
             store_type=lib.MINC2_SHORT
@@ -223,14 +280,29 @@ class minc2_file:
             self.create(path)
 
     def create(self, path):
+        """
+        Create new minc2 file, using predefined parameters
+        :param path: file path
+        :return:
+        """
         if lib.minc2_create(self._v, to_bytes(path) )!=lib.MINC2_SUCCESS:
             raise minc2_error("Error creating file:"+path)
     
     def copy_metadata(self, another):
+        """
+        Copy minc2 metadata (headers)
+        :param another: another volume
+        :return:
+        """
         if lib.minc2_copy_metadata(another._v,self._v)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error copying metadata")
     
     def load_complete_volume(self, data_type=None):
+        """
+        Load the whole volume as numpy ndarray
+        :param data_type: python data required
+        :return: numpy.ndarray
+        """
         import numpy as np
         if data_type is None:
             data_type = np.dtype( self.representation_dtype() )
@@ -261,6 +333,11 @@ class minc2_file:
         return buf
 
     def load_complete_volume_tensor(self, data_type=None):
+        """
+        Load the whole volume as pytorch tensor
+        :param data_type: python data required
+        :return: torch.Tensor
+        """
         import torch
         if data_type is None:
             data_type=self.representation_dtype_tensor()
@@ -289,10 +366,21 @@ class minc2_file:
         return buf
 
     def setup_standard_order(self):
+        """
+        Request library to use stamdard order: positive step sizes
+        dimension order (slowest to fastest): time, Z, Y, X, Vector
+        :return:
+        """
         if lib.minc2_setup_standard_order(self._v)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error setting up standard volume order")
 
     def save_complete_volume(self, buf):
+        """
+        Dump whole numpy.ndarray into minc2 volume
+        volume have to be open for writing and initialized (i.e .create or .imitate have been called)
+        :param buf: numpy.ndarray
+        :return: numpy.ndarray
+        """
         import numpy as np
         data_type=lib.MINC2_FLOAT
         store_type=buf.dtype.name
@@ -308,6 +396,12 @@ class minc2_file:
         return buf
 
     def save_complete_volume_tensor(self, buf):
+        """
+        Dump whole torch.Tensor into minc2 volume
+        volume have to be open for writing and initialized (i.e .create or .imitate have been called)
+        :param buf: torch.Tensor
+        :return: torch.Tensor
+        """
         #import torch
         data_type=lib.MINC2_FLOAT
         store_type=buf.type()
@@ -363,6 +457,12 @@ class minc2_file:
 
 
     def read_attribute(self, group, attribute):
+        """
+        Read minc2 header attribute
+        :param group: attribute group name
+        :param attribute: attribute name
+        :return:
+        """
         import numpy as np
 
         attr_type=ffi.new("int*",0)
@@ -404,6 +504,13 @@ class minc2_file:
             return buf
 
     def write_attribute(self, group, attribute, value):
+        """
+        Store attribute into minc2 file
+        :param group:  group name
+        :param attribute:  attribute name
+        :param value:  attribute value
+        :return:
+        """
         if isinstance(group, six.string_types ):
             group=to_bytes(group)
         if isinstance(attribute, six.string_types ):
@@ -428,6 +535,10 @@ class minc2_file:
                 raise minc2_error("Error writing attribute {}:{}".format(group,attribute))
 
     def metadata(self):
+        """
+        Read complete metadata from minc2 volume into a dictionary
+        :return: dict
+        """
         ret={}
 
         group_iterator=ffi.gc(lib.minc2_allocate_info_iterator(), lib.minc2_free_info_iterator)
@@ -452,52 +563,89 @@ class minc2_file:
         lib.minc2_stop_info_iterator(group_iterator)
         return ret
 
-    def write_metadata(self,m):
+    def write_metadata(self, m):
+        """
+        Dump complete dictionary as metadata info for minc2 volume (see @metadata)
+        :param m:
+        :return:
+        """
         for group,g in six.iteritems(m):
             for attr,a in six.iteritems(g):
                 self.write_attribute(group,attr,a)
 
     def store_dtype(self):
+        """
+        query storage datatype (disk representation)
+        :return: numpy.dtype describing disk storage
+        """
         _dtype = ffi.new("int*",0)
         if lib.minc2_storage_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error setting store type")
         return minc2_file.__minc2_to_numpy[_dtype[0]]
 
     def representation_dtype(self):
+        """
+        query representation datatype (as python sees the volume)
+        :return: numpy.dtype describing memory representation
+        """
         _dtype = ffi.new("int*",0)
         if lib.minc2_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error setting representation type")
         return minc2_file.__minc2_to_numpy[_dtype[0]]
 
     def representation_dtype_tensor(self):
+        """
+        query representation datatype (as python sees the volume)
+        :return: torch.type describing memory representation
+        """
+
         _dtype=ffi.new("int*",0)
         if lib.minc2_data_type(self._v,_dtype)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error setting representation type")
         return minc2_file.__minc2_to_torch[_dtype[0]]
 
-    # shortcut to setup_standard_order;load_complete_volume
+
     def get_data(self):
+        """
+        shortcut to setup_standard_order;load_complete_volume
+        :return: numpy.ndarray
+        """
         self.setup_standard_order()
         return self.load_complete_volume()
 
-    # shortcut to setup_standard_order;load_complete_volume_tensor
+
     def get_tensor(self):
+        """
+        shortcut to setup_standard_order;load_complete_volume_tensor
+        :return: torch.Tensor
+        """
         self.setup_standard_order()
         return self.load_complete_volume_tensor()
 
-    # shortcut to setup_standard_order,save_complete_volume
+
     def set_data(self,new_data):
+        """
+        shortcut to setup_standard_order,save_complete_volume
+        :param new_data: numpy.ndarray
+        :return:
+        """
         self.setup_standard_order()
         self.save_complete_volume(new_data)
 
-    # shortcut to setup_standard_order,save_complete_volume_tensor
+
     def set_tensor(self,new_data):
+        """
+        shortcut to setup_standard_order,save_complete_volume_tensor
+        :param new_data: torch.Tensor
+        :return:
+        """
         self.setup_standard_order()
         self.save_complete_volume_tensor(new_data)
 
     def get_shape(self):
         """
-        get volume shape (numpy style)
+        get volume shape (numpy style) as memory representation
+        :return tuple of dimension sizes
         """
         _dims=self.representation_dims_()
         return tuple( _dims[i].length for i in range(self.ndim()) )
@@ -505,6 +653,7 @@ class minc2_file:
     def get_start(self):
         """
         get volume starts (numpy style)
+        :return tuple of starts
         """
         _dims=self.representation_dims_()
         return tuple(_dims[i].start for i in range(self.ndim()))
@@ -512,6 +661,7 @@ class minc2_file:
     def get_step(self):
         """
         get volume steps (numpy style)
+        :return tuple of step sizes
         """
         _dims=self.representation_dims_()
         return tuple(_dims[i].step for i in range(self.ndim()))
@@ -532,12 +682,23 @@ class minc2_file:
     step = property(get_step,None,None,"Volume step (numpy style)")
 
     # hyperslab-based functions
+
     def set_volume_range(self, rmin, rmax):
+        """
+        Specify expected volume range (for volume-based intensity normalization)
+        :param rmin: expected minimal value
+        :param rmax: expected maximal value
+        :return:
+        """
         if lib.minc2_set_volume_range(self._v,rmin,rmax) != lib.MINC2_SUCCESS:
             raise minc2_error()
 
     def save_hyperslab(self, buf, start=None):
         """
+        save a hyperslab into minc2 volume
+        :param buf: numpy.ndarray with information for the hyperslab
+        :param start: array-like list describing the offset
+        :return buf
         """
         if start is None:
             return self.save_complete_volume(buf)
@@ -580,6 +741,13 @@ class minc2_file:
             return buf
 
     def save_hyperslab_t(self, buf, start=None):
+        """
+        save a hyperslab into minc2 volume (for torch.Tensor)
+        :param buf: torch.Tensor with information for the hyperslab
+        :param start: array-like list describing the offset
+        :return buf
+        """
+
         if start is None:
             return self.save_complete_volume(buf)
         else:
@@ -621,6 +789,12 @@ class minc2_file:
             return buf
 
     def load_hyperslab(self, slab=None, data_type=None):
+        """
+        Load hyperslab into memory
+        :param slab: array of format ((dim1_start[,dim1_stop]),(dim2_start[,dim2_stop]),....) describing the hyperslab to read
+        :param data_type: requested numpy datatype
+        :return: numpy.ndarray
+        """
         if data_type is None:
             data_type=self.representation_dtype()
         if slab is None:
@@ -674,6 +848,12 @@ class minc2_file:
             return buf
 
     def load_hyperslab_t(self, slab=None, data_type=None):
+        """
+        Load hyperslab into memory, for torch
+        :param slab: array of format ((dim1_start[,dim1_stop]),(dim2_start[,dim2_stop]),....) describing the hyperslab to read
+        :param data_type: requested numpy datatype
+        :return: torch.Tensor
+        """
         if data_type is None:
             data_type=self.representation_dtype_tensor()
         if slab is None:
@@ -747,10 +927,21 @@ class minc2_file:
         return slab
 
     def __getitem__(self,s):
+        """
+        numpy-style interface for reading hyperslabs from volume
+        :param s: slice information
+        :return: numpy.ndarray
+        """
         idx=self._slices_to_slab(s)
         return self.load_hyperslab(idx).squeeze()
 
     def __setitem__(self, s, val):
+        """
+        numpy-style interface for writing hyperslabs into volume
+        :param s: slice information
+        :param val:  numpy.ndarray
+        :return:
+        """
         idx=self._slices_to_slab(s)
         return self.save_hyperslab(val,idx)
 
@@ -768,16 +959,30 @@ class minc2_xfm:
 
 
     def __init__(self, path=None):
+        """
+        create new xfm object
+        :param path: file path
+        """
         self._v=ffi.gc(lib.minc2_xfm_allocate0(),lib.minc2_xfm_destroy)
         if path is not None:
             self.open(path)
 
     def open(self, path):
-        assert path is not None,"Provide minc2 file"
+        """
+        Open existing .xfm file
+        :param path: file path
+        :return:
+        """
+        assert path is not None,"Provide xfm file"
         assert lib.minc2_xfm_open(self._v,to_bytes(path)) == lib.MINC2_SUCCESS
 
     def save(self, path):
-        assert path is not None,"Provide minc2 file"
+        """
+        Save information into file
+        :param path:
+        :return:
+        """
+        assert path is not None,"Provide xfm file"
         assert(lib.minc2_xfm_save(self._v,to_bytes(path)) == lib.MINC2_SUCCESS)
 
     def transform_point(self, xyz_in):
@@ -798,6 +1003,11 @@ class minc2_xfm:
             return xyz_out
 
     def inverse_transform_point(self,xyz_in):
+        """
+        Apply inverse transformation to coordinates
+        :param xyz_in:  either 1d array or 2d array
+        :return:  1d or 3d array
+        """
         import numpy as np
         _xyz_in=np.asarray(xyz_in,'float64','C')
         if len(_xyz_in.shape)==1:
@@ -810,19 +1020,37 @@ class minc2_xfm:
             return xyz_out
 
     def invert(self):
+        """
+        invert transform
+        :return:
+        """
         assert(lib.minc2_xfm_invert(self._v)==lib.MINC2_SUCCESS)
 
     def get_n_concat(self):
+        """
+        get number of sub-transforms
+        :return: integer
+        """
         n=ffi.new("int*",0)
         assert(lib.minc2_xfm_get_n_concat(self._v,n)==lib.MINC2_SUCCESS)
         return n[0]
 
     def get_n_type(self,n=0):
+        """
+        Get n'th transform type
+        :param n: transform number
+        :return: transform type
+        """
         t=ffi.new("int*",0)
         assert(lib.minc2_xfm_get_n_type(self._v,n,t)==lib.MINC2_SUCCESS)
         return t[0]
 
     def get_grid_transform(self,n=0):
+        """
+        Extract non-linear grid transform
+        :param n: subtransform number
+        :return: (grid file, inversion flag)
+        """
         c_file=ffi.new("char**")
         inv=ffi.new("int*",0)
         assert(lib.minc2_xfm_get_grid_transform(self._v,n,inv,c_file)==lib.MINC2_SUCCESS)
@@ -831,12 +1059,23 @@ class minc2_xfm:
         return (_file,inv[0]!=0)
 
     def get_linear_transform(self,n=0):
+        """
+        Extract affine transform
+        :param n: subtransform number
+        :return: numpy.ndarray([4,4]) - matrix describing affine transform
+        """
         import numpy as np
         _mat=np.empty([4,4],'float64','C')
         assert(lib.minc2_xfm_get_linear_transform(self._v,n,ffi.cast("double *", _mat.ctypes.data))==lib.MINC2_SUCCESS)
         return _mat
 
     def get_linear_transform_param(self,n=0,center=None):
+        """
+        Extract affine transform parameters
+        :param n: subtransform number
+        :param center: rotation center
+        :return: minc2_transform_parameters linear transformation parameters
+        """
         import numpy as np
         par=minc2_transform_parameters()
 
@@ -855,7 +1094,12 @@ class minc2_xfm:
         return par
 
 
-    def append_linear_transform(self,par):
+    def append_linear_transform(self, par):
+        """
+        Concatenate linear transformation
+        :param par: if numpy.ndarray - should be 4x4 matrix describing affine transform, or it can be minc2_transform_parameters
+        :return:
+        """
         import numpy as np
         if isinstance(par,np.ndarray): # assume it's a matrix
             _mat=np.asarray(par,'float64','C')
@@ -879,10 +1123,21 @@ class minc2_xfm:
         return self
 
     def append_grid_transform(self,grid_file,inv=False):
+        """
+        Concatenate nonlinear grid transform
+        :param grid_file: grid file path
+        :param inv:  inversion flag
+        :return:
+        """
         assert(lib.minc2_xfm_append_grid_transform(self._v,to_bytes(grid_file),inv)==lib.MINC2_SUCCESS)
         return self
 
     def concat_xfm(self,another):
+        """
+        Cobcatenate another minc2_xfm transform
+        :param another: another minc2_xfm object
+        :return:
+        """
         assert(lib.minc2_xfm_concat_xfm(self._v,another._v)==lib.MINC2_SUCCESS)
 
 
@@ -891,6 +1146,11 @@ class minc2_tags:
     MINC2 tag object
     """
     def __init__(self, path=None,n_volumes=1):
+        """
+        Create object
+        :param path:  existing .tag file
+        :param n_volumes: number of expected volumes
+        """
         import numpy as np
         self.n_volumes=n_volumes
         self.tag=[]
@@ -903,6 +1163,10 @@ class minc2_tags:
             self.load(path)
 
     def __len__(self):
+        """
+        number of tags or tag pairs
+        :return: integer
+        """
         if self.tag[0] is not None:
             return self.tag[0].shape[0]
         else:
@@ -911,6 +1175,7 @@ class minc2_tags:
     def load(self, path):
         """
         load tags from a file
+        :param path: file path
         """
         assert path is not None,"Provide tag file"
         _t=ffi.gc(lib.minc2_tags_allocate0(),lib.minc2_tags_free)
@@ -952,6 +1217,11 @@ class minc2_tags:
             self.labels=None
 
     def save(self,path):
+        """
+        Save object into .tag file
+        :param path: file path
+        :return:
+        """
         assert path is not None,"Provide tag file"
         _t=ffi.gc(lib.minc2_tags_allocate0(),lib.minc2_tags_free)
 
@@ -1011,6 +1281,11 @@ class minc2_input_iterator:
     and return a vector of values
     """
     def __init__(self, files=None, data_type=None):
+        """
+        initialize iterator
+        :param files: list of minc2 files (either minc2 objects or paths)
+        :param data_type: expected data type
+        """
         self._i = ffi.gc(lib.minc2_iterator_allocate0(),lib.minc2_iterator_free)
         self._handles=[]
         self._dtype=None
@@ -1019,7 +1294,11 @@ class minc2_input_iterator:
             self.open(files,data_type=data_type)
     
     def open(self,files,data_type=None):
-
+        """
+        open files
+        :param files: list of minc2 files (either minc2 objects or paths)
+        :param data_type: expected data type
+        """
         if isinstance(files, six.string_types):
             files=(files,)
 
@@ -1042,15 +1321,26 @@ class minc2_input_iterator:
         self._last=False
 
     def close(self):
-        # close all input files
+        """
+        Close all input file, close iterator
+        :return:
+        """
         for i in self._handles:
             lib.minc2_close(i)
         self._handles=[]
 
     def dim(self):
+        """
+        number of files being used
+        :return:
+        """
         return len(self._handles)
 
     def __iter__(self):
+        """
+        iterate
+        :return:
+        """
         return self
 
     def next(self):
@@ -1074,7 +1364,8 @@ class minc2_input_iterator:
 
     def val(self):
         """
-        read the curent value without advancing
+        read the current value without advancing
+        :return nunpy.ndarray
         """
         # TODO: make sure we can read
         lib.minc2_iterator_get_values(self._i,ffi.cast("void *", self._val.ctypes.data))
