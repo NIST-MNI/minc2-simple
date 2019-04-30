@@ -14,10 +14,10 @@ else:
 def to_bytes(s):
     if isinstance(s, binary_type):
         return s
-    return text_type(s).encode("utf-8")
+    return text_type(s).encode("utf-8",errors="ignore")
 
 
 def to_unicode(s):
     if isinstance(s, text_type):
         return s
-    return binary_type(s).decode("utf-8")
+    return binary_type(s).decode("utf-8",errors="ignore")
