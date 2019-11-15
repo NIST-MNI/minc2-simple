@@ -18,11 +18,16 @@ int main(int argc,char **argv)
     }
     fname_in=argv[1];
     fname_out=argv[2];
-    
+    printf("%s %s\n",fname_in,fname_out);
     tags=minc2_tags_allocate0();
+
+    if(!tags)
+    {
+        return 1;
+    }
     
-    ret|=minc2_tags_load(fname_in,tags)==MINC2_SUCCESS;
-    ret|=minc2_tags_save(fname_out,tags)==MINC2_SUCCESS;
+    ret|=minc2_tags_load(tags,fname_out)==MINC2_SUCCESS;
+    ret|=minc2_tags_save(tags,fname_out)==MINC2_SUCCESS;
     ret|=minc2_tags_free(tags);
     
     return ret;

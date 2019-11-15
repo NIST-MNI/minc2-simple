@@ -20,7 +20,9 @@ endif()
 set (RCPPFLAGS_CMD " ${RPATH} " " CMD " " config " " --cppflags ") 
 
 execute_process(COMMAND ${RPATH} CMD config --cppflags
-                OUTPUT_VARIABLE RCPPFLAGS)
+                OUTPUT_VARIABLE RCPPFLAGS RESULT_VARIABLE RCODE )
+
+IF(RCODE EQUAL 0) # if R is missing
 				
 if (CMAKE_HOST_WIN32)					
 	if (${RCPPFLAGS} MATCHES "[-][I]([^ ;])+")
@@ -28,7 +30,8 @@ if (CMAKE_HOST_WIN32)
     endif()
 endif()
 
-string(SUBSTRING ${RCPPFLAGS} ${NUM_TRUNC_CHARS} -1 RCPPFLAGS)
+
+string(SUBSTRING "${RCPPFLAGS}" ${NUM_TRUNC_CHARS} -1 RCPPFLAGS)
 SET(RINSIDE_INCLUDE_DIR ${RCPPFLAGS})
 #include_directories(${RCPPFLAGS})
 SET(RINSIDE_LIB_DIR )
@@ -158,3 +161,7 @@ ENDIF()
 #    target_link_libraries(${source_name} ${RCPPLIBS_l})
 #       
 # endforeach (next_SOURCE ${sources})
+
+ELSE()
+  SET(RINSIDE_FOUND FALSE)
+ENDIF()
