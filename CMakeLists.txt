@@ -4,7 +4,7 @@
 
 cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
 
-PROJECT(minc2-simple C CXX)
+PROJECT(minc2-simple)
 INCLUDE(CTest)
 
 FIND_PATH( MINC_TOOLKIT_DIR bin/mincstats  HINTS $ENV{MINC_TOOLKIT} DOC "minc-toolkit install prefix")

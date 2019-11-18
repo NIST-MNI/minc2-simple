@@ -561,6 +561,6 @@ int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int ha
 
 /**
  *
- * /
+ */
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-spaces modified; hl c*/
