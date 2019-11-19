@@ -15,8 +15,10 @@
 void show_usage(const char *name)
 {
   std::cerr 
-    << "Usage: "<<name<<" <script.pth> <input>  <output> [debug]" << std::endl
+    << "Usage: "<<name<<" <script.pth> <input> <output> [debug]" << std::endl
     << "Optional parameters:" << std::endl
+    << "\t--channels <n> add more input channels, set them to 38.81240207 for now" << std::endl
+    << "\t--mask <file> use binary mask to restrict application of the network (TODO)" << std::endl
     << "\t--verbose be verbose" << std::endl
     << "\t--clobber clobber the output files" << std::endl;
 }
@@ -27,14 +29,16 @@ int main(int argc,char **argv)
     int clobber=0;
     int verbose=0;
     std::string mask_f;
+    int channels=1;
     int c;
     // read the arguments
     static struct option long_options[] =
     {
         {"verbose", no_argument, &verbose, 1},
-        {"quiet", no_argument, &verbose, 0},
+        {"quiet",   no_argument, &verbose, 0},
         {"clobber", no_argument, &clobber, 1},
-        {"mask", required_argument, 0, 'm'},
+        {"mask",    required_argument, 0, 'm'},
+        {"channels",    required_argument, 0, 'c'},
         {0, 0, 0, 0}
     };
 
@@ -52,6 +56,9 @@ int main(int argc,char **argv)
         switch (c)
         {
         case 0:
+            break;
+        case 'c':
+            channels=atoi(optarg);
             break;
         case 'm':
             mask_f=optarg;
@@ -144,6 +151,18 @@ int main(int argc,char **argv)
         // convert to 5D format
         input = input.unsqueeze(0).unsqueeze(0);
 
+        // add more input channels 
+        // TODO: read them from file
+        if(channels>1) {
+            torch::Tensor dummy = torch::full({ _dims[0].length, _dims[1].length, _dims[2].length },38.81240207);
+            dummy = dummy.unsqueeze(0).unsqueeze(0);
+            std::vector<torch::Tensor> _inputs={input};
+            for(int i=1;i<channels;i++)
+                _inputs.push_back(dummy);
+            // append new channels
+            input = torch::cat(_inputs,1);
+        }
+
 
         // TODO: make patches overlap, and then aggregate results
         for(int z=0; z< (_dims[0].length - _dims[0].length%patch_sz); z+=stride)
@@ -156,7 +175,7 @@ int main(int argc,char **argv)
                     int _y = ( y + patch_sz) > _dims[1].length ? _dims[1].length - patch_sz:y;
                     int _z = ( z + patch_sz) > _dims[0].length ? _dims[0].length - patch_sz:z;
 
-                    std::cout<<_x<<","<<_y<<","<<_z<<std::endl;
+                    std::cout << _x << "," << _y << "," << _z <<std::endl;
                     // Create a vector of inputs.
                     std::vector<torch::jit::IValue> inputs;
                     auto inp = input.slice(2,_z,_z+patch_sz).slice(3,_y,_y+patch_sz).slice(4, _x, _x+patch_sz);
@@ -171,8 +190,8 @@ int main(int argc,char **argv)
                     {
                         std::cout<<"out:"<< out.size(0)<<","<< out.size(1)<<","<< out.size(2)<<","<< out.size(3) << std::endl;
 
-                        std::cout<<"Allocating output:" << out.size(0)<<","<< _dims[0].length << ","<< _dims[1].length << "," << _dims[2].length << std::endl;
-                        std::cout<<"Allocating ones:"   << out.size(0)<<","<< patch_sz << "," << patch_sz << "," << patch_sz << std::endl;
+                        std::cout<<"Allocating output:" << out.size(0) << ","<< _dims[0].length << ","<< _dims[1].length << "," << _dims[2].length << std::endl;
+                        std::cout<<"Allocating ones:"   << out.size(0) << ","<< patch_sz << "," << patch_sz << "," << patch_sz << std::endl;
 
                         output  = torch::zeros( {out.size(0), _dims[0].length, _dims[1].length, _dims[2].length });
                         weights = torch::zeros( {out.size(0), _dims[0].length, _dims[1].length, _dims[2].length });
