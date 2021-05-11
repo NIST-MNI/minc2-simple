@@ -1,8 +1,8 @@
-## Simplified MINC2 API for C,Python and LUA
+## Simplified MINC2 API for C, Python and LUA
 ### More interfaces to come
 
 ## Goal
-To provide access to most functionality of MINC2 file format with minimal effort, with consistent interface
+To provide access to most functionality of MINC2 file format with minimal effort, with consistent interface.  Also provides support for .xfm and .tag files. If you want to read minc2 files with python with minimal effort on linux (and Mac), you are at the right place!!
 
 ## Installing
 
