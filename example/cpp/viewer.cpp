@@ -63,6 +63,10 @@ int main(int argc, char *argv[])
         std::cout<<"Dimension:"<<i<<" "<< _dims[i].id << " length:" << _dims[i].length << std::endl;
     }
 
+    std::vector<float> x_slice_buffer(_dims[1].length * _dims[2].length);
+    std::vector<float> y_slice_buffer(_dims[0].length * _dims[2].length);
+    std::vector<float> z_slice_buffer(_dims[0].length * _dims[1].length);
+
     // init GLFW & IMGUI
 
     // Setup window
@@ -92,9 +96,52 @@ int main(int argc, char *argv[])
     ImGui_ImplOpenGL2_Init();
 
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+
+    // Create a OpenGL texture identifier
+    GLuint x_slice_texture;
+    glGenTextures(1, &x_slice_texture);
+    glBindTexture(GL_TEXTURE_2D, x_slice_texture);
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+    GLuint y_slice_texture;
+    glGenTextures(1, &y_slice_texture);
+    glBindTexture(GL_TEXTURE_2D, y_slice_texture);
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
+    GLuint z_slice_texture;
+    glGenTextures(1, &z_slice_texture);
+    glBindTexture(GL_TEXTURE_2D, z_slice_texture);
+
+    // Setup filtering parameters for display
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); // This is required on WebGL for non power-of-two textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); // Same
+
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
+        static int x_slice_start[3]={0, 0, 0};
+        static int x_slice_count[3]={1, _dims[1].length,_dims[2].length};
+
+        static int y_slice_start[3]={0, 0, 0};
+        static int y_slice_count[3]={_dims[0].length, 1, _dims[2].length};
+
+        static int z_slice_start[3]={0, 0, 0};
+        static int z_slice_count[3]={_dims[0].length,_dims[1].length,1};
+
+
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
         // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
@@ -107,19 +154,16 @@ int main(int argc, char *argv[])
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+        ImGui::Begin(par["input"].as<std::string>().c_str(),nullptr,ImGuiWindowFlags_NoResize);
+        // 1. Slice control.
         {
-            static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
 
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+            ImGui::Text("%dx%dx%d", _dims[0].length, _dims[1].length, _dims[2].length);                // Display some text (you can use a format strings too)
             //ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
             //ImGui::Checkbox("Another Window", &show_another_window);
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
 
             if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
                 counter++;
@@ -127,8 +171,93 @@ int main(int argc, char *argv[])
             ImGui::Text("counter = %d", counter);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            //ImGui::End();
+        }
+
+        //2. X Slice View
+        {
+            ///ImGui::Begin("X Slice");                          // Create a window and append into it.
+            ImGui::SliderInt("X ", &x_slice_start[0], 0.0, _dims[0].length-1);  
+            ImGui::Text("start = %d,%d,%d", x_slice_start[0], x_slice_start[1], x_slice_start[2]);
+            ImGui::Text("count = %d,%d,%d", x_slice_count[0], x_slice_count[1], x_slice_count[2]);
+
+            // load slice into buffer
+            if(minc2_read_hyperslab(h,x_slice_start,x_slice_count,&x_slice_buffer[0],MINC2_FLOAT)==MINC2_SUCCESS)
+            {   
+                for(auto i=x_slice_buffer.begin();i!=x_slice_buffer.end();++i)
+                    (*i)/=100;
+
+                glBindTexture(GL_TEXTURE_2D, x_slice_texture);
+                // Upload pixels into texture
+                #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+                    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+                #endif
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, x_slice_count[1], x_slice_count[2], 0, GL_LUMINANCE, GL_FLOAT, &x_slice_buffer[0]);
+
+                ImGui::Image((void*)(intptr_t)x_slice_texture, ImVec2(x_slice_count[1], x_slice_count[2]));
+            } else {
+                ImGui::Text("Error loading slab");
+            }
+
+            //ImGui::End();
+        }
+
+        //2. Y Slice View
+        {
+            //ImGui::Begin("Y Slice");                          // Create a window and append into it.
+            ImGui::SliderInt("Y", &y_slice_start[1], 0.0, _dims[1].length-1);  
+            ImGui::Text("start = %d,%d,%d", y_slice_start[0], y_slice_start[1], y_slice_start[2]);
+            ImGui::Text("count = %d,%d,%d", y_slice_count[0], y_slice_count[1], y_slice_count[2]);
+
+            // load slice into buffer
+            if(minc2_read_hyperslab(h,y_slice_start,y_slice_count,&y_slice_buffer[0],MINC2_FLOAT)==MINC2_SUCCESS)
+            {   
+                for(auto i=y_slice_buffer.begin();i!=y_slice_buffer.end();++i)
+                    (*i)/=100;
+
+                glBindTexture(GL_TEXTURE_2D, y_slice_texture);
+                // Upload pixels into texture
+                #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+                    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+                #endif
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, y_slice_count[0], y_slice_count[2], 0, GL_LUMINANCE, GL_FLOAT, &y_slice_buffer[0]);
+
+                ImGui::Image((void*)(intptr_t)y_slice_texture, ImVec2(y_slice_count[0], y_slice_count[2]));
+            } else {
+                ImGui::Text("Error loading slab");
+            }
+
+            //ImGui::End();
+        }
+
+        //2. Y Slice View
+        {
+            //ImGui::Begin("Z Slice");                          // Create a window and append into it.
+            ImGui::SliderInt("Z", &z_slice_start[2], 0.0, _dims[2].length-1);  
+            ImGui::Text("start = %d,%d,%d", z_slice_start[0], z_slice_start[1], z_slice_start[2]);
+            ImGui::Text("count = %d,%d,%d", z_slice_count[0], z_slice_count[1], z_slice_count[2]);
+
+            // load slice into buffer
+            if(minc2_read_hyperslab(h,z_slice_start,z_slice_count,&z_slice_buffer[0],MINC2_FLOAT)==MINC2_SUCCESS)
+            {   
+                for(auto i=z_slice_buffer.begin();i!=z_slice_buffer.end();++i)
+                    (*i)/=100;
+
+                glBindTexture(GL_TEXTURE_2D, z_slice_texture);
+                // Upload pixels into texture
+                #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+                    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+                #endif
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, z_slice_count[0], z_slice_count[1], 0, GL_LUMINANCE, GL_FLOAT, &z_slice_buffer[0]);
+
+                ImGui::Image((void*)(intptr_t)z_slice_texture, ImVec2(z_slice_count[0], z_slice_count[1]));
+            } else {
+                ImGui::Text("Error loading slab");
+            }
+
             ImGui::End();
         }
+
 
         // Rendering
         ImGui::Render();
@@ -155,7 +284,6 @@ int main(int argc, char *argv[])
     ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
-    glfwTerminate();
 
     minc2_close(h);
     minc2_free(h);
@@ -169,6 +297,8 @@ int main(int argc, char *argv[])
   } catch(...) {
         std::cerr << "Unknown exception caught" << std::endl;
   }
+  glfwTerminate();
+
   return 1;
 }
 
