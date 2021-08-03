@@ -1,3 +1,6 @@
+OPTION(BUILD_IMGUI_DEMO "Build ImGUI Demo APP" OFF)
+
+SET(OpenGL_GL_PREFERENCE "LEGACY")
 find_package(OpenGL REQUIRED)
 
 add_subdirectory(glfw)
@@ -27,18 +30,33 @@ add_library(imgui
 target_include_directories(imgui PUBLIC imgui)
 target_include_directories(imgui PUBLIC . .. imgui/examples)
 target_compile_definitions(imgui PUBLIC -DIMGUI_IMPL_OPENGL_LOADER_GLAD)
-
-target_link_libraries(imgui PRIVATE glfw)
+target_link_libraries(imgui PUBLIC glfw)
 
 add_executable(viewer viewer.cpp)
 
-target_include_directories(viewer PRIVATE imgui imgui/backends )
-target_include_directories(viewer PRIVATE glfw/include)
+target_include_directories(viewer PUBLIC imgui imgui/backends )
+target_include_directories(viewer PUBLIC glfw/include)
 
-target_link_libraries(viewer PRIVATE minc2-simple imgui glfw ${LIBMINC_LIBRARIES})
+target_link_libraries(viewer PUBLIC minc2-simple imgui glfw ${LIBMINC_LIBRARIES})
 
 if(TARGET OpenGL::GL)
-    target_link_libraries(viewer PRIVATE OpenGL::GL)
+    target_link_libraries(viewer PUBLIC OpenGL::GL)
 else()
-    target_link_libraries(viewer PRIVATE ${OPENGL_gl_LIBRARY})
+    target_link_libraries(viewer PUBLIC ${OPENGL_gl_LIBRARY})
 endif()
+
+
+IF(BUILD_IMGUI_DEMO)
+    add_executable(imgui_demo imgui/imgui_demo.cpp imgui_demo_main.cpp)
+    target_include_directories(imgui_demo PUBLIC imgui imgui/backends )
+    target_include_directories(imgui_demo PUBLIC glfw/include)
+
+    target_link_libraries(imgui_demo PUBLIC imgui glfw)
+
+    if(TARGET OpenGL::GL)
+        target_link_libraries(imgui_demo PUBLIC OpenGL::GL)
+    else()
+        target_link_libraries(imgui_demo PUBLIC ${OPENGL_gl_LIBRARY})
+    endif()
+
+ENDIF()

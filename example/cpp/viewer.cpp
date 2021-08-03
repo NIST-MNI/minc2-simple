@@ -132,15 +132,19 @@ int main(int argc, char *argv[])
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
-        static int x_slice_start[3]={0, 0, 0};
+        // initial slice position
+        static int x_slice_start[3]={_dims[0].length/2, 0, 0};
         static int x_slice_count[3]={1, _dims[1].length,_dims[2].length};
 
-        static int y_slice_start[3]={0, 0, 0};
+        static int y_slice_start[3]={0, _dims[1].length/2, 0};
         static int y_slice_count[3]={_dims[0].length, 1, _dims[2].length};
 
-        static int z_slice_start[3]={0, 0, 0};
+        static int z_slice_start[3]={0, 0, _dims[2].length/2};
         static int z_slice_count[3]={_dims[0].length,_dims[1].length,1};
 
+        // intensity normalization
+        static float norm_min = 0.0;
+        static float norm_max = 100.0;
 
         // Poll and handle events (inputs, window resize, etc.)
         // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -154,38 +158,30 @@ int main(int argc, char *argv[])
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin(par["input"].as<std::string>().c_str(),nullptr,ImGuiWindowFlags_NoResize);
-        // 1. Slice control.
+        // file options
         {
+            ImGui::Begin(par["input"].as<std::string>().c_str(),nullptr,ImGuiWindowFlags_AlwaysAutoResize);
             static int counter = 0;
-
-
             ImGui::Text("%dx%dx%d", _dims[0].length, _dims[1].length, _dims[2].length);                // Display some text (you can use a format strings too)
-            //ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            //ImGui::Checkbox("Another Window", &show_another_window);
 
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
+            ImGui::InputFloat("Min", &norm_min);
             ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+            ImGui::InputFloat("Max", &norm_max);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            //ImGui::End();
+            ImGui::End();
         }
 
         //2. X Slice View
         {
-            ///ImGui::Begin("X Slice");                          // Create a window and append into it.
+            ImGui::Begin("Sagittal",nullptr,ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::SliderInt("X ", &x_slice_start[0], 0.0, _dims[0].length-1);  
-            ImGui::Text("start = %d,%d,%d", x_slice_start[0], x_slice_start[1], x_slice_start[2]);
-            ImGui::Text("count = %d,%d,%d", x_slice_count[0], x_slice_count[1], x_slice_count[2]);
 
             // load slice into buffer
             if(minc2_read_hyperslab(h,x_slice_start,x_slice_count,&x_slice_buffer[0],MINC2_FLOAT)==MINC2_SUCCESS)
             {   
                 for(auto i=x_slice_buffer.begin();i!=x_slice_buffer.end();++i)
-                    (*i)/=100;
+                    (*i)=((*i)-norm_min)/(norm_max-norm_min);
 
                 glBindTexture(GL_TEXTURE_2D, x_slice_texture);
                 // Upload pixels into texture
@@ -194,26 +190,24 @@ int main(int argc, char *argv[])
                 #endif
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, x_slice_count[1], x_slice_count[2], 0, GL_LUMINANCE, GL_FLOAT, &x_slice_buffer[0]);
 
-                ImGui::Image((void*)(intptr_t)x_slice_texture, ImVec2(x_slice_count[1], x_slice_count[2]));
+                ImGui::Image((void*)(intptr_t)x_slice_texture, ImVec2(x_slice_count[1], x_slice_count[2]), ImVec2(0.0, 1.0), ImVec2(1.0, 0.0));
             } else {
                 ImGui::Text("Error loading slab");
             }
 
-            //ImGui::End();
+            ImGui::End();
         }
 
         //2. Y Slice View
         {
-            //ImGui::Begin("Y Slice");                          // Create a window and append into it.
+            ImGui::Begin("Coronal",nullptr,ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::SliderInt("Y", &y_slice_start[1], 0.0, _dims[1].length-1);  
-            ImGui::Text("start = %d,%d,%d", y_slice_start[0], y_slice_start[1], y_slice_start[2]);
-            ImGui::Text("count = %d,%d,%d", y_slice_count[0], y_slice_count[1], y_slice_count[2]);
 
             // load slice into buffer
             if(minc2_read_hyperslab(h,y_slice_start,y_slice_count,&y_slice_buffer[0],MINC2_FLOAT)==MINC2_SUCCESS)
             {   
                 for(auto i=y_slice_buffer.begin();i!=y_slice_buffer.end();++i)
-                    (*i)/=100;
+                    (*i)=((*i)-norm_min)/(norm_max-norm_min);
 
                 glBindTexture(GL_TEXTURE_2D, y_slice_texture);
                 // Upload pixels into texture
@@ -222,26 +216,24 @@ int main(int argc, char *argv[])
                 #endif
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, y_slice_count[0], y_slice_count[2], 0, GL_LUMINANCE, GL_FLOAT, &y_slice_buffer[0]);
 
-                ImGui::Image((void*)(intptr_t)y_slice_texture, ImVec2(y_slice_count[0], y_slice_count[2]));
+                ImGui::Image((void*)(intptr_t)y_slice_texture, ImVec2(y_slice_count[0], y_slice_count[2]), ImVec2(0.0, 1.0), ImVec2(1.0, 0.0));
             } else {
                 ImGui::Text("Error loading slab");
             }
 
-            //ImGui::End();
+            ImGui::End();
         }
 
         //2. Y Slice View
         {
-            //ImGui::Begin("Z Slice");                          // Create a window and append into it.
+            ImGui::Begin("Axial",nullptr,ImGuiWindowFlags_AlwaysAutoResize);                          // Create a window and append into it.
             ImGui::SliderInt("Z", &z_slice_start[2], 0.0, _dims[2].length-1);  
-            ImGui::Text("start = %d,%d,%d", z_slice_start[0], z_slice_start[1], z_slice_start[2]);
-            ImGui::Text("count = %d,%d,%d", z_slice_count[0], z_slice_count[1], z_slice_count[2]);
 
             // load slice into buffer
             if(minc2_read_hyperslab(h,z_slice_start,z_slice_count,&z_slice_buffer[0],MINC2_FLOAT)==MINC2_SUCCESS)
             {   
                 for(auto i=z_slice_buffer.begin();i!=z_slice_buffer.end();++i)
-                    (*i)/=100;
+                    (*i)=((*i)-norm_min)/(norm_max-norm_min);
 
                 glBindTexture(GL_TEXTURE_2D, z_slice_texture);
                 // Upload pixels into texture
@@ -250,7 +242,7 @@ int main(int argc, char *argv[])
                 #endif
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, z_slice_count[0], z_slice_count[1], 0, GL_LUMINANCE, GL_FLOAT, &z_slice_buffer[0]);
 
-                ImGui::Image((void*)(intptr_t)z_slice_texture, ImVec2(z_slice_count[0], z_slice_count[1]));
+                ImGui::Image((void*)(intptr_t)z_slice_texture, ImVec2(z_slice_count[0], z_slice_count[1]), ImVec2(0.0, 1.0), ImVec2(1.0, 0.0));
             } else {
                 ImGui::Text("Error loading slab");
             }
@@ -287,7 +279,8 @@ int main(int argc, char *argv[])
 
     minc2_close(h);
     minc2_free(h);
-    
+    glfwTerminate();
+
     return 0;
   } catch (const cxxopts::OptionException& e) {
     std::cerr << "error parsing options: " << e.what() << std::endl;
@@ -297,6 +290,7 @@ int main(int argc, char *argv[])
   } catch(...) {
         std::cerr << "Unknown exception caught" << std::endl;
   }
+
   glfwTerminate();
 
   return 1;
