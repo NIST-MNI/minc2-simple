@@ -29,8 +29,10 @@ setup(
     install_requires=["cffi>=1.0.0","six"],
     setup_requires=["cffi>=1.0.0","six"],
     cffi_modules=[
-        "./minc2_simple/minc2_simple_build.py:ffi",
+        "minc2_simple/minc2_simple_build.py:ffibuilder",
     ],
-    scripts=(['../example/python/xfmavg_scipy.py']),
-    test_suite="test"
+    scripts=(['example/python/xfmavg_scipy.py']),
+    test_suite="test",
+    ###
+    include_package_data=True
 )

@@ -361,7 +361,7 @@ class minc2_file:
 
         buf=dtype(*shape)
 
-        if lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.storage().data_ptr()) , data_type)!=lib.MINC2_SUCCESS:
+        if lib.minc2_load_complete_volume(self._v, ffi.cast("void *", buf.untyped_storage().data_ptr()) , data_type)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error loading volume")
         return buf
 
@@ -411,7 +411,7 @@ class minc2_file:
 
         data_type=minc2_file.__torch_to_minc2[store_type]
 
-        if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.storage().data_ptr()),data_type)!=lib.MINC2_SUCCESS:
+        if lib.minc2_save_complete_volume(self._v,ffi.cast("void *", buf.untyped_storage().data_ptr()),data_type)!=lib.MINC2_SUCCESS:
             raise minc2_error("Error saving volume")
         return buf
 
@@ -796,7 +796,7 @@ class minc2_file:
                     slab_start[ndims-1-i]=0
 
             if lib.minc2_write_hyperslab( self._v, slab_start, slab_count,
-                                          ffi.cast("void *", buf.storage().data_ptr()),
+                                          ffi.cast("void *", buf.untyped_storage().data_ptr()),
                                           data_type ) != lib.MINC2_SUCCESS:
                 raise minc2_error("Error writing hyperslab")
             return buf
@@ -912,7 +912,7 @@ class minc2_file:
             buf=dtype(*dims)
 
             if lib.minc2_read_hyperslab( self._v, slab_start, slab_count,
-                                         ffi.cast("void *", buf.storage().data_ptr()),
+                                         ffi.cast("void *", buf.untyped_storage().data_ptr()),
                                          data_type ) != lib.MINC2_SUCCESS:
                 raise minc2_error("Error reading hyperslab")
             return buf

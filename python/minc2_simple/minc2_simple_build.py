@@ -1,12 +1,19 @@
 import os
 import sys
-from cffi import FFI
+import cffi
 from sys import platform
   
-ffi = FFI()
+ffibuilder = cffi.FFI()
 
-minc_prefix=os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.17")
-source_path=os.path.join(os.path.dirname(__file__), "../../src")
+
+minc_prefix = os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.17")
+source_path = "src"#os.path.join(os.path.dirname(__file__), "../src")
+
+print("*******************")
+print(f"{os.getcwd()=}")
+print(f"{source_path=}")
+print("*******************")
+
 
 _extra_link_args_debug=['-g']
 _extra_compile_args_debug=['-fsanitize=address','-fno-omit-frame-pointer','-g']
@@ -34,7 +41,7 @@ if platform == "linux" or platform == "linux2":
 elif platform == "darwin":
   _extra_link_args=['-Xlinker','-rpath','-Xlinker',os.path.join(minc_prefix,"lib")]
 
-ffi.set_source("minc2_simple._simple",
+ffibuilder.set_source("minc2_simple._simple",
     minc2_simple_src,
     # The important thing is to include libc in the list of libraries we're
     # linking against:
@@ -45,8 +52,9 @@ ffi.set_source("minc2_simple._simple",
     extra_link_args=_extra_link_args
 )
 
-ffi.cdef(minc2_simple_defs )
+ffibuilder.cdef(minc2_simple_defs )
+
 
 
 if __name__ == "__main__":
-    ffi.compile(verbose=True)
+    ffibuilder.compile(verbose=True)
