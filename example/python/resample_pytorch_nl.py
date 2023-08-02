@@ -171,12 +171,17 @@ if __name__ == '__main__':
 
     # add identity transform
     identity_grid = F.affine_grid(torch.tensor(np.eye(4)[0:3,0:4]).unsqueeze(0), [1, 1, *data.size()], align_corners=True)
-
     # resample grid into data space
-    # and convert to torch sampling (-1,1) 
+
+    # and convert to torch sampling (-1,1)
+    # here we assume that there is no rotation that need to be applied (!)
+    # otherwise we would need to apply each voxel vector to a rotaion matrix
+    _,step,_ = decompose(v2w_data)
+    voxel_scaling_factor = (torch.tensor([2.0/data.shape[2], 2.0/data.shape[1], 2.0/data.shape[0]]) / torch.tensor(step) ).unsqueeze(0).unsqueeze(0)
+
     pytorch_grid = torch.stack([ 
-        F.grid_sample(grid_xfm[:,:,:,i].unsqueeze(0).unsqueeze(0), map_grid, align_corners=True).squeeze(0).squeeze(0)*2/data.size()[2-i]
-                       for i in range(3) ],dim=3).unsqueeze(0) 
+        F.grid_sample(grid_xfm[:,:,:,i].unsqueeze(0).unsqueeze(0), map_grid, align_corners=True).squeeze(0).squeeze(0)*2
+                       for i in range(3) ],dim=3).unsqueeze(0) * voxel_scaling_factor
 
     if params.grid is not None:
         for i in range(3):
