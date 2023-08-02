@@ -53,11 +53,11 @@ def affine_to_dims(aff, shape):
     start, step, dir_cos = decompose(aff)
     if len(shape) == 3: # this is a 3D volume
         dims=[
-            minc2_dim(id=i+1, length=shape[i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
+            minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
         ]
     elif len(shape) == 4: # this is a 3D grid volume, vector space is the last one
         dims=[
-            minc2_dim(id=i+1, length=shape[i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
+            minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
         ] + [ minc2_dim(id=minc2_file.MINC2_DIM_VEC, length=shape[3], start=0, step=1, have_dir_cos=False, dir_cos=[0,0,0])]
     else:
         assert(False)
@@ -76,8 +76,8 @@ def load_input(fname, as_byte=False):
     return d, aff
 
 
-def save_minc_volume(fn,data,aff,ref_fname=None,history=None):
-    dims=affine_to_dims(aff,data.shape)
+def save_minc_volume(fn, data, aff, ref_fname=None, history=None):
+    dims=affine_to_dims(aff, data.shape)
     out=minc2_file()
     out.define(dims, minc2_file.MINC2_SHORT, minc2_file.MINC2_DOUBLE)
     out.create(fn)
@@ -141,10 +141,20 @@ def parse_options():
     
     parser.add_argument("--grid", type=str, 
                         help="output grid prefix")
+    
+    parser.add_argument("--like", type=str, 
+                        help="Use this sampling for output")
 
     params = parser.parse_args()
     
     return params
+
+
+# voxel to pytorch:
+def create_v2p_matrix(shape):
+    v2p = np.diag( [2/shape[0],   2/shape[1],   2/shape[2], 1])
+    v2p[0:3,3] = (  1/shape[0]-1, 1/shape[1]-1, 1/shape[2]-1  ) # adjust for half a voxel shift
+    return v2p
 
 if __name__ == '__main__':
     _history=format_history(sys.argv)
@@ -152,31 +162,31 @@ if __name__ == '__main__':
 
     data, v2w = load_input(params.input) # volume andvoxel to world matrix
 
-    xfm=load_lin_xfm(params.xfm) # transformation matrix
+    if params.like is not None:
+        like_data, like_v2w = load_input(params.like)
+    else:
+        like_data = data
+        like_v2w = v2w
+
+    xfm = load_lin_xfm(params.xfm) # transformation matrix
 
     # world to voxel matrix
     w2v = np.linalg.inv(v2w) 
 
-    # voxel to pytorch matrix:
-    v2p = np.diag( [2/data.shape[0],  2/data.shape[1], 2/data.shape[2], 1])
-    v2p[0:3,3] = (1/data.shape[0]-1, 1/data.shape[1]-1, 1/data.shape[2]-1) # adjust for half a voxel shift
-
-    # pytroch to voxel matrix
-    p2v=np.linalg.inv(v2p)
-
     # convert from voxel notation to pytorch notation
-    full_xfm=v2p @ w2v @ np.linalg.inv(xfm) @ v2w @ p2v
+    full_xfm = create_v2p_matrix(data.shape) @ w2v @ np.linalg.inv(xfm) @ like_v2w @ np.linalg.inv(create_v2p_matrix(like_data.shape) )
 
+    grid_size = [1, 1, *like_data.shape]
     # convert into deformation field
-    grid = F.affine_grid(torch.tensor(full_xfm[0:3,0:4]).unsqueeze(0), [1, 1, *data.size()],align_corners=True)
+    grid = F.affine_grid(torch.tensor(full_xfm[0:3, 0:4]).unsqueeze(0), 
+                         grid_size, align_corners=False)
 
     # debug 
-    print(f"{grid.shape=}")
     if params.grid is not None:
         for i in range(3):
-            save_minc_volume( f"{params.grid}_{i}.mnc", grid[0,:,:,:,i].contiguous(), v2w, ref_fname=params.input,history=_history)
+            save_minc_volume( f"{params.grid}_{i}.mnc", grid[0,:,:,:,i].contiguous(), like_v2w, ref_fname=params.input, history=_history)
     
     out = F.grid_sample(data.unsqueeze(0).unsqueeze(0), grid, align_corners=True).squeeze(0).squeeze(0)
 
     print("Will save to "+params.output)
-    save_minc_volume( params.output,out,v2w, ref_fname=params.input,history=_history)
+    save_minc_volume( params.output, out , like_v2w, ref_fname=params.input,history=_history)
