@@ -12,11 +12,9 @@ import sys
 
 import numpy as np
 
-# deep models
+# torch stuff
 import torch
-from model.util import *
 
-# debug
 from minc2_simple import minc2_file
 from minc2_simple import minc2_xfm,minc2_dim
 
@@ -31,7 +29,8 @@ def hdr_to_affine(hdr):
     rot=np.zeros((3,3))
     scales=np.zeros((3,3))
     start=np.zeros(3)
-    ax = np.array([hdr[j].id for j in range(3)])
+
+    ax = np.array([h.id for h in hdr])
 
     for i in range(3):
         aa=np.where(ax == (i+1))[0][0] # HACK, assumes DIM_X=1,DIM_Y=2 etc
@@ -49,15 +48,26 @@ def hdr_to_affine(hdr):
     out[0:3,3] = origin
     return out
 
-def affine_to_dims(aff,shape):
+def affine_to_dims(aff, shape):
+    # convert to minc2 sampling format
     start, step, dir_cos = decompose(aff)
-    dims=[
-        minc2_dim(id=i+1,length=shape[i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
-    ]
+    if len(shape) == 3: # this is a 3D volume
+        dims=[
+            minc2_dim(id=i+1, length=shape[i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
+        ]
+    elif len(shape) == 4: # this is a 3D grid volume, vector space is the last one
+        dims=[
+            minc2_dim(id=i+1, length=shape[i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
+        ] + [ minc2_dim(id=minc2_file.MINC2_DIM_VEC, length=shape[3], start=0, step=1, have_dir_cos=False, dir_cos=[0,0,0])]
+    else:
+        assert(False)
+
     return dims
 
-
-def load_input(fname, as_byte=False):
+""" 
+    Load minc volume into numpy array and return voxel2wordl matrix too
+"""
+def load_minc_volume(fname, as_byte=False):
     mm=minc2_file(fname)
     mm.setup_standard_order()
 
@@ -67,9 +77,8 @@ def load_input(fname, as_byte=False):
     mm.close()
     return d, aff
 
-
-def save_minc_volume(fn,data,aff,ref_fname=None,history=None):
-    dims=affine_to_dims(aff,data.shape)
+def save_minc_volume(fn, data, aff, ref_fname=None, history=None):
+    dims=affine_to_dims(aff, data.shape)
     out=minc2_file()
     out.define(dims, minc2_file.MINC2_SHORT, minc2_file.MINC2_DOUBLE)
     out.create(fn)
@@ -94,27 +103,31 @@ def decompose(aff):
     return start, step, dir_cos
 
 
-def load_xfm(fn):
+def load_nl_xfm(fn):
     x=minc2_xfm(fn)
     if x.get_n_concat()==1 and x.get_n_type(0)==minc2_xfm.MINC2_XFM_LINEAR:
-        # this is a linear matrix
-        lin_xfm=np.asmatrix(x.get_linear_transform())
-        return lin_xfm
+        assert(False)
     else:
+        _identity=np.asmatrix(np.identity(4))
+        _eps=1e-6
         if x.get_n_type(0)==minc2_xfm.MINC2_XFM_LINEAR and x.get_n_type(1)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
-            assert(scipy.linalg.norm(_identity-np.asmatrix(x.get_linear_transform(0)) )<=_eps)
+            assert(np.linalg.norm(_identity-np.asmatrix(x.get_linear_transform(0)) )<=_eps)
+            grid_file, grid_invert=x.get_grid_transform(1)
+        elif x.get_n_type(0)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
             # TODO: if grid have to be inverted!
-            grid_file,grid_invert=x.get_grid_transform(1)
-        elif x.get_n_type(1)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
-            # TODO: if grid have to be inverted!
-            (grid_file,grid_invert)=x.get_grid_transform(0)
-        assert(False) # TODO
-        return None
+            grid_file, grid_invert =x.get_grid_transform(0)
+        else:
+            # probably unsupported type
+            assert(False)
+
+        # load grid file into 4D memory
+        grid, v2w = load_minc_volume(grid_file, as_byte=False)
+        return grid,v2w,grid_invert
 
 
 def parse_options():
 
-    parser = argparse.ArgumentParser(description='Apply xfms to minc file',
+    parser = argparse.ArgumentParser(description='Apply nonlinear xfms to minc file',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument("input", type=str, default=None,
@@ -134,25 +147,28 @@ if __name__ == '__main__':
     _history=format_history(sys.argv)
     params = parse_options()
 
-    data, v2w=load_input(params.input)
-    xfm=load_xfm(params.xfm)
-    w2v=np.linalg.inv(v2w)
-    # TODO: save
-    print(f"{v2w=}\n{w2v=}\n{xfm=}\n{data.shape=}\n{data.dtype=}")
+    data, v2w = load_minc_volume(params.input)
+    grid_xfm,v2w_xfm,inv_xfm = load_nl_xfm(params.xfm)
+    w2v = np.linalg.inv(v2w)
 
     # voxel to pytorch:
     v2p = np.diag( [2/data.shape[0],  2/data.shape[1], 2/data.shape[2], 1])
     v2p[0:3,3] = (1/data.shape[0]-1, 1/data.shape[1]-1, 1/data.shape[2]-1) # adjust for half a voxel shift
 
-    p2v=np.linalg.inv(v2p)
+    p2v = np.linalg.inv(v2p)
 
-    print(f"{v2p=}\n{p2v=}")
+    # print(f"{v2p=}\n{p2v=}")
 
-    full_xfm=v2p @ w2v @ np.linalg.inv(xfm) @ v2w @ p2v
+    #full_xfm=v2p @ w2v @ np.linalg.inv(xfm) @ v2w @ p2v
 
-    print(f"{full_xfm[0:3,0:4]=}")
+    #print(f"{full_xfm[0:3,0:4]=}")
 
-    grid = F.affine_grid(torch.tensor(full_xfm[0:3,0:4]).unsqueeze(0), [1, 1, *data.size()],align_corners=True)
+    #grid = F.affine_grid(torch.tensor(full_xfm[0:3,0:4]).unsqueeze(0), [1, 1, *data.size()],align_corners=True)
+
+    # need to sample grid in the same sampling as input data first (?)
+    grid=torch.stack([grid_xfm[:,:,:,i]/data.shape[i] for i in range(3)],dim=3).unsqueeze(0)
+
+    # THIS SHOULD FAIL 
 
     print(f"{grid.shape=} {grid.dtype=}")
     out = F.grid_sample(data.unsqueeze(0).unsqueeze(0), grid, align_corners=True).squeeze(0).squeeze(0)
