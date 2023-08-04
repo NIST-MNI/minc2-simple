@@ -32,21 +32,28 @@ def parse_options():
     parser.add_argument("input", type=str, default=None,
                         help="Input minc file")
     
-    parser.add_argument("xfm", type=str, 
-                        help="Input transform file")
-    
     parser.add_argument("output", type=str, 
                         help="Output minc file")
     
-    parser.add_argument("--grid", type=str, 
-                        help="output grid prefix")
-    
     parser.add_argument("--like", type=str, 
                         help="Use this sampling for output")
+    
+    parser.add_argument("--rot", type=float, nargs=3, default=[0,0,0],
+                        help="Rotation in degrees")
+    
+    parser.add_argument("--scale", type=float, nargs=3, default=[1,1,1],
+                        help="Scale factors")
+    
+    parser.add_argument("--shift", type=float, nargs=3, default=[0,0,0],
+                        help="shifts")
+    
+    parser.add_argument("--shear", type=float, nargs=6, default=[0,0,0,0,0,0],
+                        help="shers")
 
     params = parser.parse_args()
     
     return params
+
 
 if __name__ == '__main__':
     _history=format_history(sys.argv)
@@ -60,7 +67,9 @@ if __name__ == '__main__':
         like_data = data
         like_v2w = v2w
 
-    xfm = load_lin_xfm(params.xfm) # transformation matrix
+    #xfm = load_lin_xfm(params.xfm) # transformation matrix
+    xfm = create_transform(np.array(params.rot)*m.pi/180, params.scale, params.shift, params.shear)
+    print(f"{xfm=}")
 
     # world to voxel matrix
     w2v = np.linalg.inv(v2w) 
@@ -73,12 +82,8 @@ if __name__ == '__main__':
     grid = F.affine_grid(torch.tensor(full_xfm[0:3, 0:4]).unsqueeze(0), 
                          grid_size, align_corners=False)
 
-    # debug 
-    if params.grid is not None:
-        for i in range(3):
-            save_minc_volume( f"{params.grid}_{i}.mnc", grid[0,:,:,:,i].contiguous(), like_v2w, ref_fname=params.input, history=_history)
-    
     out = F.grid_sample(data.unsqueeze(0).unsqueeze(0), grid, align_corners=True).squeeze(0).squeeze(0)
 
     print("Will save to "+params.output)
     save_minc_volume( params.output, out , like_v2w, ref_fname=params.input,history=_history)
+
