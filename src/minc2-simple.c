@@ -1073,7 +1073,7 @@ int minc2_voxel_to_world_vec(minc2_file_handle h, int n,int stride, const double
 
   for(i=0;i<n;i++ ) {
     const double* in_voxel=&voxel[i*stride];
-    double *out_world=&voxel[i*stride];
+    double *out_world=&world[i*stride];
 
     ret =  ret || minc2_voxel_to_world(h, in_voxel, out_world);
   }
@@ -1552,7 +1552,7 @@ int minc2_xfm_transform_point_vec(minc2_xfm_file_handle h,int n,int stride,const
     int ret=MINC2_SUCCESS;
     for(i=0;i<n;i++)
     {
-        double *pnt_in=&in[i*stride];
+        const double *pnt_in=&in[i*stride];
         double *pnt_out=&out[i*stride];
         ret = ret ||  minc2_xfm_transform_point(h,pnt_in,pnt_out);
     }
@@ -1572,7 +1572,7 @@ int minc2_xfm_inverse_transform_point_vec(minc2_xfm_file_handle h,int n,int stri
     int ret=MINC2_SUCCESS;
     for(i=0;i<n;i++)
     {
-        double *pnt_in=&in[i*stride];
+        const double *pnt_in=&in[i*stride];
         double *pnt_out=&out[i*stride];
         ret = ret || minc2_xfm_inverse_transform_point(h,pnt_in,pnt_out);
     }
