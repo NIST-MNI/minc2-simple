@@ -33,7 +33,7 @@ def hdr_to_affine(hdr):
     origin = start@rot
     out=np.eye(4)
 
-    out[0:3,0:3] = (scales.T*rot).T
+    out[0:3,0:3] = (scales.T@rot).T
     out[0:3,3] = origin
     return out
 
