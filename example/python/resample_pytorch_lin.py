@@ -63,7 +63,7 @@ if __name__ == '__main__':
     xfm = load_lin_xfm(params.xfm) # transformation matrix
 
     # world to voxel matrix
-    w2v = np.linalg.inv(v2w) 
+    w2v = np.linalg.inv(v2w)
 
     # convert from voxel notation to pytorch notation
     full_xfm = create_v2p_matrix(data.shape) @ w2v @ np.linalg.inv(xfm) @ like_v2w @ np.linalg.inv(create_v2p_matrix(like_data.shape) )
@@ -82,3 +82,4 @@ if __name__ == '__main__':
 
     print("Will save to "+params.output)
     save_minc_volume( params.output, out , like_v2w, ref_fname=params.input,history=_history)
+    
