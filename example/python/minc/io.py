@@ -6,7 +6,7 @@ from minc2_simple import minc2_xfm,minc2_dim
 import numpy as np
 
 
-from .geo import decompose
+from .geo import decompose,compose
 
 
 def format_history(argv):
@@ -130,3 +130,33 @@ def load_lin_xfm(fn):
             (grid_file, grid_invert)=x.get_grid_transform(0)
         assert(False) # TODO
         return None
+    
+"""
+Resample volume to the uniform sampling, if needed
+"""
+def uniformize_volume(data,v2w,tolerance=0.1,order=1,step=1.0):
+
+    start, step_, dir_cos = decompose(v2w)
+
+    # check if we need to resample
+    if np.any(np.abs(step_ - step) > tolerance):
+        import scipy
+       
+        # voxel storage matrix
+        xyz_to_zyx = np.array([[0,0,1,0],
+                            [0,1,0,0],
+                            [1,0,0,0],
+                            [0,0,0,1]])
+        # need to account for the different order of dimensions
+        new_shape = np.ceil(np.array(data.shape) * step_[[2,1,0]]).astype(int)
+        # have to account for the shift of the voxel center
+        new_start = start - step_*0.5 + np.ones(3)*step*0.5
+        new_v2w = compose(new_start, np.ones(3)*step, dir_cos)
+
+        full_xfm = xyz_to_zyx @ np.linalg.inv(v2w) @ new_v2w @ xyz_to_zyx
+
+        out = scipy.ndimage.affine_transform(data, full_xfm, output_shape=new_shape, order=order, mode='constant',cval=0.0)
+        
+        return out, new_v2w
+    else:
+        return data, v2w
