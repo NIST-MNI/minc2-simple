@@ -82,4 +82,4 @@ if __name__ == '__main__':
 
     print("Will save to "+params.output)
     save_minc_volume( params.output, out , like_v2w, ref_fname=params.input,history=_history)
-    
+    full_xfm = w2v @  like_v2w 

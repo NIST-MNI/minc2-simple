@@ -6,10 +6,17 @@ def decompose(aff):
     (u,s,vh) = np.linalg.svd(aff[0:3,0:3])
     # remove scaling
     dir_cos = u @ vh
-    step  = np.diag(aff[0:3,0:3] @ np.linalg.inv(dir_cos))
-    start = (aff[0:3,3].T @ np.linalg.inv(dir_cos)).T
+    step  = np.diag(  aff[0:3,0:3] @ np.linalg.inv(dir_cos))
+    start = np.squeeze(np.asarray(np.squeeze(aff[0:3,3]) @ np.linalg.inv(dir_cos)))
     return start, step, dir_cos
 
+def compose(start, step, dir_cos):
+    aff=np.eye(4)
+
+    aff[0:3,0:3] = np.diag(step) @ dir_cos
+    aff[0:3,3]   = start @ dir_cos
+
+    return aff
 
 # voxel to pytorch:
 def create_v2p_matrix(shape):

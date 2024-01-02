@@ -30,11 +30,12 @@ def hdr_to_affine(hdr):
 
         scales[i,i] = hdr[aa].step
         start[i] = hdr[aa].start
+    
     origin = start@rot
     out=np.eye(4)
 
-    out[0:3,0:3] = (scales.T@rot).T
-    out[0:3,3] = origin
+    out[0:3,0:3] = scales@rot
+    out[0:3,3]   = origin
     return out
 
 
@@ -43,11 +44,11 @@ def affine_to_dims(aff, shape):
     start, step, dir_cos = decompose(aff)
     if len(shape) == 3: # this is a 3D volume
         dims=[
-                minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
+                minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=np.ascontiguousarray(dir_cos[i,0:3])) for i in range(3)
             ]
     elif len(shape) == 4: # this is a 3D grid volume, vector space is the last one
         dims=[
-                minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=dir_cos[i,0:3]) for i in range(3)
+                minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=np.ascontiguousarray(dir_cos[i,0:3])) for i in range(3)
             ] + [ minc2_dim(id=minc2_file.MINC2_DIM_VEC, length=shape[3], start=0, step=1, have_dir_cos=False, dir_cos=[0,0,0])]
     else:
         assert(False)
