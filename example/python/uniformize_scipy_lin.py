@@ -74,7 +74,9 @@ if __name__ == '__main__':
 
     data, v2w = load_minc_volume(params.input) # volume and voxel to world matrix
     start, step, dir_cos = decompose(v2w)
-
+    print(f"{start=}")
+    print(f"{step=}")
+    print(f"{dir_cos=}")
     # voxel storage matrix
     xyz_to_zyx = np.array([[0,0,1,0],
                            [0,1,0,0],
@@ -82,7 +84,7 @@ if __name__ == '__main__':
                            [0,0,0,1]])
     
     # need to account for the different order of dimensions
-    new_shape = np.ceil(np.array(data.shape) * step[[2,1,0]]).astype(int)
+    new_shape = np.ceil(np.array(data.shape).astype(np.float64) * step[[2,1,0]]).astype(int)
 
     # have to account for the shift of the voxel center
     new_start = start - step*0.5 + np.ones(3)*0.5
@@ -91,7 +93,7 @@ if __name__ == '__main__':
 
     full_xfm = xyz_to_zyx @ np.linalg.inv(v2w) @ new_v2w @ xyz_to_zyx
 
-    out = scipy.ndimage.affine_transform(data, full_xfm, output_shape=new_shape, order=params.order, mode='constant',cval=0.0)
+    out = scipy.ndimage.affine_transform(data, full_xfm, output_shape=new_shape, order=params.order, mode='constant', cval=0.0)
 
     save_minc_volume( params.output, out , new_v2w, ref_fname=params.input, history=_history)
     
