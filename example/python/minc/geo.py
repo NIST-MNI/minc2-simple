@@ -1,239 +1,101 @@
-#! /usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-from minc2_simple import minc2_file
-from minc2_simple import minc2_xfm
-from minc2_simple import minc2_dim
-from minc2_simple import minc2_error
-
-from time import gmtime, strftime
-
 import numpy as np
+import math as m
 
-from .geo import decompose,compose
-
-""" 
-    Create minc-style history entry
 """
-def format_history(argv):
-    stamp=strftime("%a %b %d %T %Y>>>", gmtime())
-    return stamp+(' '.join(argv))
-
-""" 
-    Convert minc file header int voxel to world affine matrix
+    decompose affine matrix into start, step and direction cosines
 """
-def hdr_to_affine(hdr):
-    rot=np.zeros((3,3))
-    scales=np.zeros((3,3))
-    start=np.zeros(3)
-
-    ax = np.array([h.id for h in hdr])
-
-    for i in range(3):
-        aa=np.where(ax == (i+1))[0][0] # HACK, assumes DIM_X=1,DIM_Y=2 etc
-        if hdr[aa].have_dir_cos:
-            rot[i,:] = hdr[aa].dir_cos
-        else:
-            rot[i,i] = 1
-
-        scales[i,i] = hdr[aa].step
-        start[i] = hdr[aa].start
-    
-    origin = start@rot
-    out=np.eye(4)
-
-    out[0:3,0:3] = scales@rot
-    out[0:3,3]   = origin
-    return out
+def decompose(aff):
+    (u,s,vh) = np.linalg.svd(aff[0:3,0:3])
+    # remove scaling
+    dir_cos = u @ vh
+    step  = np.diag(  aff[0:3,0:3] @ np.linalg.inv(dir_cos))
+    start = np.squeeze(np.asarray(np.squeeze(aff[0:3,3]) @ np.linalg.inv(dir_cos)))
+    return start, step, dir_cos
 
 
 """
-    Convert affine matrix into minc file dimension description
+create affine matrix from start, step and direction cosines
 """
-def affine_to_dims(aff, shape):
-    # convert to minc2 sampling format
-    start, step, dir_cos = decompose(aff)
-    if len(shape) == 3: # this is a 3D volume
-        dims=[
-                minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=np.ascontiguousarray(dir_cos[i,0:3])) for i in range(3)
-            ]
-    elif len(shape) == 4: # this is a 3D grid volume, vector space is the last one
-        dims=[
-                minc2_dim(id=i+1, length=shape[2-i], start=start[i], step=step[i], have_dir_cos=True, dir_cos=np.ascontiguousarray(dir_cos[i,0:3])) for i in range(3)
-            ] + [ minc2_dim(id=minc2_file.MINC2_DIM_VEC, length=shape[3], start=0, step=1, have_dir_cos=False, dir_cos=[0,0,0])]
-    else:
-        assert False, f"Unsupported number of dimensions: {len(shape)}"
-    return dims
+def compose(start, step, dir_cos):
+    aff=np.eye(4)
 
+    aff[0:3,0:3] = np.diag(step) @ dir_cos
+    aff[0:3,3]   = start @ dir_cos
 
-""" 
-    Load minc volume into tensor and return voxel2world matrix too
-"""
-def load_minc_volume(fname, as_byte=False):
-    mm=minc2_file(fname)
-    mm.setup_standard_order()
-
-    d = mm.load_complete_volume_tensor(minc2_file.MINC2_UBYTE if as_byte else minc2_file.MINC2_DOUBLE)
-    aff = np.asmatrix(hdr_to_affine(mm.representation_dims()))
-
-    mm.close()
-    return d, aff
-
-
-
-""" 
-    Load minc volume into numpy volume and return voxel2world matrix too
-"""
-def load_minc_volume_np(fname, as_byte=False):
-    mm=minc2_file(fname)
-    mm.setup_standard_order()
-
-    d = mm.load_complete_volume(minc2_file.MINC2_UBYTE if as_byte else minc2_file.MINC2_DOUBLE)
-    aff=np.asmatrix(hdr_to_affine(mm.representation_dims()))
-
-    mm.close()
-    return d, aff
+    return aff
 
 
 """
-    Save torch tensor on numpy volume into minc file
+    compose affine matrix from start, step and direction cosines
 """
-def save_minc_volume(fn, data, aff, ref_fname=None, history=None):
-    dims=affine_to_dims(aff, data.shape)
-    out=minc2_file()
-    if data.dtype == np.uint8: 
-        out.define(dims, minc2_file.MINC2_UBYTE, minc2_file.MINC2_UBYTE)
-    elif data.dtype == np.uint16:
-        out.define(dims, minc2_file.MINC2_USHORT, minc2_file.MINC2_USHORT)
-    elif data.dtype == np.int8: 
-        out.define(dims, minc2_file.MINC2_BYTE, minc2_file.MINC2_BYTE)
-    elif data.dtype == np.int16:
-        out.define(dims, minc2_file.MINC2_SHORT, minc2_file.MINC2_SHORT)
-    elif data.dtype == np.float32:
-        out.define(dims, minc2_file.MINC2_SHORT, minc2_file.MINC2_FLOAT)
-    elif data.dtype == np.float64:
-        out.define(dims, minc2_file.MINC2_SHORT, minc2_file.MINC2_DOUBLE)
-    else:
-        assert(False) # unsupported type
+def compose(start, step, dir_cos):
+    aff=np.eye(4)
 
-    out.create(fn)
-    
-    if ref_fname is not None:
-        ref=minc2_file(ref_fname)
-        out.copy_metadata(ref)
+    aff[0:3,0:3] = np.diag(step) @ dir_cos
+    aff[0:3,3]   = start @ dir_cos
 
-    if history is not None:
-        try:
-            old_history=out.read_attribute("","history")
-            old_history=old_history+"\n"
-        except minc2_error: # assume no history available
-            old_history=""
-            
-        new_history=old_history+history
-        out.write_attribute("","history",new_history)
-
-    out.setup_standard_order()
-    if isinstance(data, np.ndarray):
-        out.save_complete_volume(np.ascontiguousarray(data))
-    else:
-        out.save_complete_volume_tensor(data)
-    out.close()
-
+    return aff
 
 """
-    WIP: load a nonlinear only transform
+    create voxel to pytorch matrix
 """
-def load_nl_xfm(fn):
-    x=minc2_xfm(fn)
-    if x.get_n_concat()==1 and x.get_n_type(0)==minc2_xfm.MINC2_XFM_LINEAR:
-        assert(False)
-    else:
-        _identity=np.asmatrix(np.identity(4))
-        _eps=1e-6
-        if x.get_n_type(0)==minc2_xfm.MINC2_XFM_LINEAR and x.get_n_type(1)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
-            assert(np.linalg.norm(_identity-np.asmatrix(x.get_linear_transform(0)) )<=_eps)
-            grid_file, grid_invert=x.get_grid_transform(1)
-        elif x.get_n_type(0)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
-            # TODO: if grid have to be inverted!
-            grid_file, grid_invert =x.get_grid_transform(0)
-        else:
-            # probably unsupported type
-            assert(False)
-
-        # load grid file into 4D memory
-        grid, v2w = load_minc_volume(grid_file, as_byte=False)
-        return grid, v2w, grid_invert
+def create_v2p_matrix(shape):
+    v2p = np.diag( [2/shape[2],   2/shape[1],   2/shape[0], 1])
+    v2p[0:3,3] = (  1/shape[2]-1, 1/shape[1]-1, 1/shape[0]-1  ) # adjust for half a voxel shift
+    return v2p
 
 """
-    WIP: load a linear only transform
+    create rotation matrix
 """
-def load_lin_xfm(fn):
-    _identity=np.asmatrix(np.identity(4))
-    _eps=1e-6
-    x=minc2_xfm(fn)
-
-    if x.get_n_concat()==1 and x.get_n_type(0)==minc2_xfm.MINC2_XFM_LINEAR:
-        # this is a linear matrix
-        lin_xfm=np.asmatrix(x.get_linear_transform())
-        return lin_xfm
-    else:
-        if x.get_n_type(0)==minc2_xfm.MINC2_XFM_LINEAR and x.get_n_type(1)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
-            # is this identity matrix
-            assert(np.linalg.norm(_identity-np.asmatrix(x.get_linear_transform(0)) )<=_eps)
-            # TODO: if grid have to be inverted!
-            grid_file, grid_invert=x.get_grid_transform(1)
-        elif x.get_n_type(1)==minc2_xfm.MINC2_XFM_GRID_TRANSFORM:
-            # TODO: if grid have to be inverted!
-            (grid_file, grid_invert)=x.get_grid_transform(0)
-        assert(False) # TODO
-        return None
-
+def create_rotation_matrix(rot):
+    affine_x = np.eye(4)
+    # rotate around x
+    sin_, cos_ = m.sin(rot[0]), m.cos(rot[0])
+    affine_x[1, 1], affine_x[1, 2] = cos_, -sin_
+    affine_x[2, 1], affine_x[2, 2] = sin_, cos_
+    # rotate around y
+    affine_y = np.eye(4)
+    sin_, cos_ = m.sin(rot[1]), m.cos(rot[1])
+    affine_y[0, 0], affine_y[0, 2] = cos_, sin_
+    affine_y[2, 0], affine_y[2, 2] = -sin_, cos_
+    # rotate around z
+    sin_, cos_ = m.sin(rot[2]), m.cos(rot[2])
+    affine_z = np.eye(4)
+    affine_z[0, 0], affine_z[0, 1] = cos_, -sin_
+    affine_z[1, 0], affine_z[1, 1] = sin_, cos_
+    return  affine_x @ affine_y @ affine_z
 
 """
-    Resample volume to different sampling
+    create scale matrix
 """
-def resample_volume(in_data, in_v2w, out_shape, out_v2w, order=1, fill=0.0):
-    import scipy
-    
-    # voxel storage matrix
-    xyz_to_zyx = np.array([[0,0,1,0],
-                        [0,1,0,0],
-                        [1,0,0,0],
-                        [0,0,0,1]])
-    
-    # have to account for the shift of the voxel center
-
-    full_xfm = xyz_to_zyx @ np.linalg.inv(in_v2w) @ out_v2w @ xyz_to_zyx
-
-    new_data = scipy.ndimage.affine_transform(in_data, full_xfm, output_shape=out_shape, order=order, mode='constant',cval=fill)
-    
-    return new_data, out_v2w
-
+def create_scale_matrix(scale):
+    return np.diag( [*scale, 1.0])
 
 """
-    Resample volume to the uniform sampling, if needed
+    create translation matrix
 """
-def uniformize_volume(data,v2w,tolerance=0.1,order=1,step=1.0):
+def create_translation_matrix(shift):
+    affine=np.eye(4)
+    affine[0:3,3]=shift
+    return affine
 
-    start, step_, dir_cos = decompose(v2w)
+"""
+    create shear matrix
+"""
+def create_shear_matrix(shear):
+    affine = np.eye(4)
+    affine[0, 1], affine[0, 2] = shear[0], shear[1]
+    affine[1, 0], affine[1, 2] = shear[2], shear[3]
+    affine[2, 0], affine[2, 1] = shear[4], shear[5]
+    return affine
 
-    # check if we need to resample
-    if np.any(np.abs(step_ - step) > tolerance):
-      
-        # voxel storage matrix
-        xyz_to_zyx = np.array([[0,0,1,0],
-                            [0,1,0,0],
-                            [1,0,0,0],
-                            [0,0,0,1]])
-        # need to account for the different order of dimensions
-        new_shape = np.ceil(np.array(data.shape) * step_[[2,1,0]]).astype(int)
-        # have to account for the shift of the voxel center
-        new_start = start - step_*0.5 + np.ones(3)*step*0.5
-        new_v2w = compose(new_start, np.ones(3)*step, dir_cos)
+"""
+    create full transform matrix from parameters
+"""
+def create_transform(rot, scale, shift, shear):
+    Mrot=create_rotation_matrix(rot)
+    Mscale=create_scale_matrix(scale)
+    Mshear=create_shear_matrix(shear)
+    Mtrans=create_translation_matrix(shift)
 
-        return resample_volume(data,v2w,new_shape,new_v2w,order=order,fill=0.0)
-    else:
-        return data, v2w
-
-
-
+    return Mtrans @ Mshear @ Mscale @ Mrot
