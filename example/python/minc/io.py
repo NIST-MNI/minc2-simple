@@ -82,15 +82,19 @@ def load_minc_volume(fname, as_byte=False):
     return d, aff
 
 
-
 """ 
     Load minc volume into numpy volume and return voxel2world matrix too
 """
-def load_minc_volume_np(fname, as_byte=False):
+def load_minc_volume_np(fname, as_byte=False, dtype=None):
     mm=minc2_file(fname)
     mm.setup_standard_order()
 
-    d = mm.load_complete_volume(minc2_file.MINC2_UBYTE if as_byte else minc2_file.MINC2_DOUBLE)
+    if as_byte:
+        dtype='uint8'
+    elif dtype is None:
+        dtype='float64'
+
+    d = mm.load_complete_volume(dtype)
     aff=np.asmatrix(hdr_to_affine(mm.representation_dims()))
 
     mm.close()
