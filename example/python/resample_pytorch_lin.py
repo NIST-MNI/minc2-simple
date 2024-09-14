@@ -81,5 +81,4 @@ if __name__ == '__main__':
     out = F.grid_sample(data.unsqueeze(0).unsqueeze(0), grid, align_corners=True).squeeze(0).squeeze(0)
 
     print("Will save to "+params.output)
-    save_minc_volume( params.output, out , like_v2w, ref_fname=params.input,history=_history)
-    full_xfm = w2v @  like_v2w 
+    save_minc_volume( params.output, out.numpy() , like_v2w, ref_fname=params.input,history=_history)
