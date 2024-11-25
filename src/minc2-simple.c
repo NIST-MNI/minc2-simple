@@ -234,7 +234,7 @@ int minc2_open(minc2_file_handle h, const char * path)
     h->store_dims[h->ndims-i-1].length=h->dimension_size[i];
     
     /*TODO:Do not read this information for vector_dimension!*/
-    if(miget_dimension_separation(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].step)<0) {
+    if(miget_dimension_separation(h->file_dims[i],MI_ORDER_FILE,&h->store_dims[h->ndims-i-1].step)<0) {
       /*MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension step");
       return MINC2_ERROR;*/
       h->store_dims[h->ndims-i-1].step=0.0; /*set default value of 0, if there is no step size*/
@@ -247,7 +247,7 @@ int minc2_open(minc2_file_handle h, const char * path)
       h->store_dims[h->ndims-i-1].have_dir_cos=0;
     
     /*TODO:Do not read this information for vector_dimension!*/
-    if(miget_dimension_start(h->file_dims[i],MI_FILE_ORDER,&h->store_dims[h->ndims-i-1].start)<0)
+    if(miget_dimension_start(h->file_dims[i],MI_ORDER_FILE,&h->store_dims[h->ndims-i-1].start)<0)
     {
       /*MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension start");
       return MINC2_ERROR;*/
@@ -467,8 +467,8 @@ int minc2_setup_standard_order(minc2_file_handle h)
       
       h->representation_dims[usable_dimensions] = h->store_dims[dimension_indeces[i]];
       
-      miget_dimension_separation(h->apparent_dims[h->ndims-1-usable_dimensions],MI_POSITIVE,&h->representation_dims[usable_dimensions].step);
-      miget_dimension_start(     h->apparent_dims[h->ndims-1-usable_dimensions],MI_POSITIVE,&h->representation_dims[usable_dimensions].start);
+      miget_dimension_separation(h->apparent_dims[h->ndims-1-usable_dimensions],MI_ORDER_APPARENT,&h->representation_dims[usable_dimensions].step);
+      miget_dimension_start(     h->apparent_dims[h->ndims-1-usable_dimensions],MI_ORDER_APPARENT,&h->representation_dims[usable_dimensions].start);
       
       /*
       if(i>0 && i<4)
