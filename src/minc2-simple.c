@@ -2271,7 +2271,9 @@ static int minc2_tags_convert_from_VIO(minc2_tags_handle tags,
   if(labels) {
     int i;
     tags->labels=malloc(n_tag_points*sizeof(const char *));
-    for(i=0;i<n_tag_points;i++) tags->labels[i]=strdup(labels[i]);
+    for(i=0;i<n_tag_points;i++) {
+        tags->labels[i] = labels[i] ? strdup(labels[i]) : NULL;
+    }
   } else {
     tags->labels=NULL;
   }
