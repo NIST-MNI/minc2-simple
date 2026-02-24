@@ -2,7 +2,7 @@
 #
 # Vladimir S. FONOV - vladimir.fonov@gmail.com
 
-cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5...4.2 FATAL_ERROR)
 
 PROJECT(minc2-simple)
 INCLUDE(CTest)
