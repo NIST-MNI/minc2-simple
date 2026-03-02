@@ -21,7 +21,7 @@ TARGET_LINK_LIBRARIES(test-variable minc2-simple)
 
 
 #TODO: add proper arguments to testing functions here
-ADD_TEST(test-io-full       test-io-full ${CMAKE_CURRENT_SOURCE_DIR}/test-nan-float.mnc ${CMAKE_CURRENT_BINARY_DIR}/test-nan-float_.mnc) 
+ADD_TEST(test-io-full       test-io-full ${CMAKE_CURRENT_SOURCE_DIR}/test-nan-float-history.mnc ${CMAKE_CURRENT_BINARY_DIR}/test-nan-float_.mnc) 
 ADD_TEST(test-io-hyper      test-io-hyper ${CMAKE_CURRENT_SOURCE_DIR}/test-nan-float.mnc ${CMAKE_CURRENT_BINARY_DIR}/test-nan-float_.mnc)
 ADD_TEST(test-io-hyper-norm test-io-hyper-norm ${CMAKE_CURRENT_SOURCE_DIR}/test-nan-float.mnc ${CMAKE_CURRENT_BINARY_DIR}/test-nan-float_.mnc)
 ADD_TEST(test-io-iterator   test-io-iterator ${CMAKE_CURRENT_SOURCE_DIR}/test-nan-float.mnc ${CMAKE_CURRENT_BINARY_DIR}/test-nan-float_.mnc)
