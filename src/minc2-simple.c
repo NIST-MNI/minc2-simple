@@ -2434,4 +2434,114 @@ int minc2_tags_init(minc2_tags_handle tags, int n_tag_points, int n_volumes, int
   return MINC2_SUCCESS;
 }
 
+
+int minc2_get_variable_ndims(minc2_file_handle h,const char *path,const char *name,int *ndims)
+{
+  int _ndims;
+  if(!h->vol) return MINC2_ERROR;
+
+  _ndims=miget_variable_ndims(h->vol,path,name);
+  if(_ndims<0)
+    return MINC2_ERROR;
+
+  *ndims=_ndims;
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_get_variable_dims(minc2_file_handle h,const char *path,const char *name,int *dims)
+{
+  int _ndims;
+  int i;
+  hsize_t _dims[MI2_MAX_VAR_DIMS];
+
+  if(!h->vol) return MINC2_ERROR;
+
+  _ndims=miget_variable_ndims(h->vol,path,name);
+  if(_ndims<0)
+    return MINC2_ERROR;
+
+  if(miget_variable_dims(h->vol,path,name,_dims)<0)
+    return MINC2_ERROR;
+
+  for(i=0;i<_ndims;i++)
+    dims[i]=(int)_dims[i];
+
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_get_variable_type(minc2_file_handle h,const char *path,const char *name,int *minc2_type)
+{
+  mitype_t _type;
+  if(!h->vol) return MINC2_ERROR;
+
+  *minc2_type=MINC2_UNKNOWN;
+  if(miget_variable_type(h->vol,path,name,&_type)<0)
+    return MINC2_ERROR;
+
+  *minc2_type=_mitype_to_minc2_type(_type);
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_read_variable_raw(minc2_file_handle h,const char *path,const char *name,
+    int representation_type,int *start,int *count,void *buffer)
+{
+  int _ndims;
+  int i;
+  hsize_t _start[MI2_MAX_VAR_DIMS];
+  hsize_t _count[MI2_MAX_VAR_DIMS];
+  mitype_t buffer_type;
+
+  if(!h->vol) return MINC2_ERROR;
+
+  _ndims=miget_variable_ndims(h->vol,path,name);
+  if(_ndims<0)
+    return MINC2_ERROR;
+
+  for(i=0;i<_ndims;i++)
+  {
+    _start[i]=(hsize_t)start[i];
+    _count[i]=(hsize_t)count[i];
+  }
+
+  buffer_type=_minc2_type_to_mitype(representation_type);
+
+  if(miget_variable_raw(h->vol,path,name,buffer_type,_start,_count,buffer)<0)
+    return MINC2_ERROR;
+
+  return MINC2_SUCCESS;
+}
+
+
+int minc2_write_variable_raw(minc2_file_handle h,const char *path,const char *name,
+    int representation_type,int *start,int *count,void *buffer)
+{
+  int _ndims;
+  int i;
+  hsize_t _start[MI2_MAX_VAR_DIMS];
+  hsize_t _count[MI2_MAX_VAR_DIMS];
+  mitype_t buffer_type;
+
+  if(!h->vol) return MINC2_ERROR;
+
+  _ndims=miget_variable_ndims(h->vol,path,name);
+  if(_ndims<0)
+    return MINC2_ERROR;
+
+  for(i=0;i<_ndims;i++)
+  {
+    _start[i]=(hsize_t)start[i];
+    _count[i]=(hsize_t)count[i];
+  }
+
+  buffer_type=_minc2_type_to_mitype(representation_type);
+
+  if(miset_variable_raw(h->vol,path,name,buffer_type,_start,_count,buffer)<0)
+    return MINC2_ERROR;
+
+  return MINC2_SUCCESS;
+}
+
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-spaces modified; hl c*/

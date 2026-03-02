@@ -560,7 +560,36 @@ int minc2_tags_save(minc2_tags_handle tags,const char *file);
 int minc2_tags_init(minc2_tags_handle tags,int n_tag_points,int n_volumes,int have_weights,int have_strucure_ids,int have_patient_ids,int have_labels);
 
 /**
- *
+ * get number of dimensions for a variable
+ * path is the HDF5 group name (e.g., "dimensions")
+ * name is the dataset name (e.g., "time")
  */
+int minc2_get_variable_ndims(minc2_file_handle h,const char *path,const char *name,int *ndims);
+
+/**
+ * get dimension sizes for a variable
+ * dims array must be pre-allocated with at least ndims elements
+ */
+int minc2_get_variable_dims(minc2_file_handle h,const char *path,const char *name,int *dims);
+
+/**
+ * get data type of a variable
+ * returns minc2 type id in *minc2_type
+ */
+int minc2_get_variable_type(minc2_file_handle h,const char *path,const char *name,int *minc2_type);
+
+/**
+ * read raw variable data (hyperslab)
+ * start and count arrays use same dimension order as returned by minc2_get_variable_dims
+ */
+int minc2_read_variable_raw(minc2_file_handle h,const char *path,const char *name,
+    int representation_type,int *start,int *count,void *buffer);
+
+/**
+ * write raw variable data (hyperslab)
+ * start and count arrays use same dimension order as returned by minc2_get_variable_dims
+ */
+int minc2_write_variable_raw(minc2_file_handle h,const char *path,const char *name,
+    int representation_type,int *start,int *count,void *buffer);
 
 /* kate: indent-mode cstyle; indent-width 2; replace-tabs on; remove-trailing-spaces modified; hl c*/
