@@ -151,6 +151,11 @@ int minc2_destroy(minc2_file_handle h);
  */
 int minc2_open(minc2_file_handle h,const char * path);
 
+/**
+ * open existing file in read-write mode
+ */
+int minc2_open_rdwr(minc2_file_handle h,const char * path);
+
 
 /**
  * define a new minc2 volume, using provided storage dimension information and storage data type

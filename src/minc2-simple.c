@@ -143,7 +143,7 @@ int minc2_free(minc2_file_handle h)
 }
 
 
-int minc2_open(minc2_file_handle h, const char * path)
+static int _minc2_open_with_mode(minc2_file_handle h, const char * path, int mode)
 {
   /*voxel valid range*/
   double valid_min,valid_max;
@@ -155,7 +155,7 @@ int minc2_open(minc2_file_handle h, const char * path)
   int n_dims;
   int i;
 
-  if ( miopen_volume(path, MI2_OPEN_READ, &h->vol) < 0 ) {
+  if ( miopen_volume(path, mode, &h->vol) < 0 ) {
     MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't open minc file");
     return MINC2_ERROR;
   }
@@ -397,7 +397,15 @@ int minc2_open(minc2_file_handle h, const char * path)
   return MINC2_SUCCESS;
 }
 
+int minc2_open(minc2_file_handle h, const char * path)
+{
+  return _minc2_open_with_mode(h, path, MI2_OPEN_READ);
+}
 
+int minc2_open_rdwr(minc2_file_handle h, const char * path)
+{
+  return _minc2_open_with_mode(h, path, MI2_OPEN_RDWR);
+}
 
 
 int minc2_slice_ndim(minc2_file_handle h,int *slice_ndim)

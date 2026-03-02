@@ -9,6 +9,25 @@ ffibuilder = cffi.FFI()
 minc_prefix = os.environ.get('MINC_TOOLKIT',"/opt/minc/1.9.17")
 source_path = "src"#os.path.join(os.path.dirname(__file__), "../src")
 
+# HDF5 include directory: auto-detect via pkg-config if not bundled with MINC_TOOLKIT
+_hdf5_include_dirs = []
+_hdf5_include = os.path.join(minc_prefix, "include", "hdf5.h")
+if not os.path.exists(_hdf5_include):
+  import subprocess
+  try:
+    _hdf5_cflags = subprocess.check_output(
+        ["pkg-config", "--cflags", "hdf5"],
+        stderr=subprocess.DEVNULL).decode().strip()
+    for _flag in _hdf5_cflags.split():
+      if _flag.startswith("-I"):
+        _hdf5_include_dirs.append(_flag[2:])
+  except (subprocess.CalledProcessError, FileNotFoundError):
+    # fallback: common system paths
+    for _p in ["/usr/include/hdf5/serial", "/usr/include"]:
+      if os.path.exists(os.path.join(_p, "hdf5.h")):
+        _hdf5_include_dirs.append(_p)
+        break
+
 print("*******************")
 print(f"{os.getcwd()=}")
 print(f"{source_path=}")
@@ -46,7 +65,7 @@ ffibuilder.set_source("minc2_simple._simple",
     # The important thing is to include libc in the list of libraries we're
     # linking against:
     libraries=["minc2","c"],
-    include_dirs=[os.path.join(minc_prefix,"include"),source_path],
+    include_dirs=[os.path.join(minc_prefix,"include"),source_path] + _hdf5_include_dirs,
     library_dirs=[os.path.join(minc_prefix,"lib")],
     extra_compile_args=_extra_compile_args,
     extra_link_args=_extra_link_args

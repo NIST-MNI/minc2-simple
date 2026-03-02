@@ -125,12 +125,21 @@ class minc2_file:
 
     def open(self, path):
         """
-        Open existing minc2 file
+        Open existing minc2 file (read-only)
         :param path: file path
         :return: None
         """
         if lib.minc2_open(self._v, to_bytes(path))!=lib.MINC2_SUCCESS:
             raise minc2_error("Can't open file:"+path)
+
+    def open_rdwr(self, path):
+        """
+        Open existing minc2 file in read-write mode
+        :param path: file path
+        :return: None
+        """
+        if lib.minc2_open_rdwr(self._v, to_bytes(path))!=lib.MINC2_SUCCESS:
+            raise minc2_error("Can't open file for writing:"+path)
 
     def close(self):
         """
@@ -1017,6 +1026,8 @@ class minc2_file:
         :param count: element counts for hyperslab (list of int, default: full extent)
         :return: numpy.ndarray
         """
+        import numpy as np
+
         if isinstance(path, six.string_types):
             path = to_bytes(path)
         if isinstance(name, six.string_types):
