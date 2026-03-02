@@ -1,23 +1,20 @@
-LINK_LIBRARIES(${LIBMINC_LIBRARIES})
-
-
 ADD_EXECUTABLE(test-io-full   test-io-full.c)
-TARGET_LINK_LIBRARIES(test-io-full minc2-simple ${LIBMINC_LIBRARIES})
+TARGET_LINK_LIBRARIES(test-io-full minc2-simple)
 
 ADD_EXECUTABLE(test-io-hyper   test-io-hyper.c)
-TARGET_LINK_LIBRARIES(test-io-hyper minc2-simple ${LIBMINC_LIBRARIES})
+TARGET_LINK_LIBRARIES(test-io-hyper minc2-simple)
 
 ADD_EXECUTABLE(test-io-hyper-norm   test-io-hyper-norm.c)
-TARGET_LINK_LIBRARIES(test-io-hyper-norm minc2-simple ${LIBMINC_LIBRARIES})
+TARGET_LINK_LIBRARIES(test-io-hyper-norm minc2-simple)
 
 ADD_EXECUTABLE(test-io-iterator   test-io-iterator.c)
-TARGET_LINK_LIBRARIES(test-io-iterator minc2-simple ${LIBMINC_LIBRARIES})
+TARGET_LINK_LIBRARIES(test-io-iterator minc2-simple)
 
 ADD_EXECUTABLE(test-nan     test-nan.c)
-TARGET_LINK_LIBRARIES(test-nan minc2-simple ${LIBMINC_LIBRARIES})
+TARGET_LINK_LIBRARIES(test-nan minc2-simple)
 
 ADD_EXECUTABLE(test-tags     test-tags.c)
-TARGET_LINK_LIBRARIES(test-tags minc2-simple ${LIBMINC_LIBRARIES})
+TARGET_LINK_LIBRARIES(test-tags minc2-simple)
 
 
 #TODO: add proper arguments to testing functions here

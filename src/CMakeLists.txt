@@ -6,7 +6,12 @@ IF(BUILD_MINC2_SIMPLE_SHARED)
               minc2-simple.h
               minc2-simple-int.h
               )
-  TARGET_LINK_LIBRARIES(minc2-simple ${LIBMINC_LIBRARIES})
+  TARGET_LINK_LIBRARIES(minc2-simple PUBLIC ${LIBMINC_TARGET})
+  target_include_directories(minc2-simple
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+      $<INSTALL_INTERFACE:include>
+  )
   set_target_properties(minc2-simple PROPERTIES MACOSX_RPATH ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX})
 
   INSTALL(TARGETS minc2-simple 
@@ -25,7 +30,12 @@ IF(BUILD_MINC2_SIMPLE_STATIC)
               minc2-simple-int.h
             )
               
-  TARGET_LINK_LIBRARIES(minc2-simple-static ${LIBMINC_LIBRARIES})
+  TARGET_LINK_LIBRARIES(minc2-simple-static PUBLIC ${LIBMINC_TARGET})
+  target_include_directories(minc2-simple-static
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+      $<INSTALL_INTERFACE:include>
+  )
 
   set_target_properties(minc2-simple-static PROPERTIES MACOSX_RPATH ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX})
   set_target_properties(minc2-simple-static PROPERTIES PUBLIC_HEADER "minc2-simple.h;minc2-simple-int.h")
@@ -36,4 +46,3 @@ IF(BUILD_MINC2_SIMPLE_STATIC)
           PUBLIC_HEADER DESTINATION include)
 
 ENDIF()
-

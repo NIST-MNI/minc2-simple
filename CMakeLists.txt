@@ -10,6 +10,17 @@ INCLUDE(CTest)
 FIND_PATH( MINC_TOOLKIT_DIR bin/mincstats  HINTS $ENV{MINC_TOOLKIT} DOC "minc-toolkit install prefix")
 FIND_PACKAGE( LIBMINC REQUIRED HINTS ${MINC_TOOLKIT_DIR}/lib${LIB_SUFFIX})
 
+# Resolve the libminc target name:
+#  - installed libminc provides LIBMINC::minc2 (via NAMESPACE in install(EXPORT))
+#  - build-tree libminc provides minc2 (no namespace)
+if(TARGET LIBMINC::minc2)
+  set(LIBMINC_TARGET LIBMINC::minc2)
+elseif(TARGET minc2)
+  set(LIBMINC_TARGET minc2)
+else()
+  message(FATAL_ERROR "LIBMINC found but neither LIBMINC::minc2 nor minc2 target exists")
+endif()
+
 OPTION(BUILD_EXAMPLES "Build examples." OFF)
 
 OPTION(BUILD_MINC2_SIMPLE_SHARED "Build shared library" ON)
@@ -17,9 +28,6 @@ OPTION(BUILD_MINC2_SIMPLE_STATIC "Build static library" ON)
 
 
 ENABLE_TESTING()
-
-INCLUDE( ${LIBMINC_USE_FILE} )
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 SET(CMAKE_MACOSX_RPATH ON)
 SET(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX})
