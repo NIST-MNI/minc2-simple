@@ -958,6 +958,140 @@ class minc2_file:
         idx=self._slices_to_slab(s)
         return self.save_hyperslab(val,idx)
 
+    def variable_ndims(self, path, name):
+        """
+        Get number of dimensions for a variable (HDF5 dataset).
+        :param path: HDF5 group path (e.g., "dimensions")
+        :param name: dataset name (e.g., "time")
+        :return: integer number of dimensions
+        """
+        if isinstance(path, six.string_types):
+            path = to_bytes(path)
+        if isinstance(name, six.string_types):
+            name = to_bytes(name)
+        ndims = ffi.new("int*", 0)
+        if lib.minc2_get_variable_ndims(self._v, path, name, ndims) != lib.MINC2_SUCCESS:
+            raise minc2_error("Error getting variable ndims for {}:{}".format(path, name))
+        return ndims[0]
+
+    def variable_dims(self, path, name):
+        """
+        Get dimension sizes for a variable (HDF5 dataset).
+        :param path: HDF5 group path (e.g., "dimensions")
+        :param name: dataset name (e.g., "time")
+        :return: list of dimension sizes
+        """
+        if isinstance(path, six.string_types):
+            path = to_bytes(path)
+        if isinstance(name, six.string_types):
+            name = to_bytes(name)
+        ndims = self.variable_ndims(path, name)
+        dims = ffi.new("int[]", ndims)
+        if lib.minc2_get_variable_dims(self._v, path, name, dims) != lib.MINC2_SUCCESS:
+            raise minc2_error("Error getting variable dims for {}:{}".format(path, name))
+        return [dims[i] for i in range(ndims)]
+
+    def variable_type(self, path, name):
+        """
+        Get data type of a variable (HDF5 dataset).
+        :param path: HDF5 group path (e.g., "dimensions")
+        :param name: dataset name (e.g., "time")
+        :return: minc2 type id (integer, use minc2_file.MINC2_FLOAT etc. for comparison)
+        """
+        if isinstance(path, six.string_types):
+            path = to_bytes(path)
+        if isinstance(name, six.string_types):
+            name = to_bytes(name)
+        dtype = ffi.new("int*", 0)
+        if lib.minc2_get_variable_type(self._v, path, name, dtype) != lib.MINC2_SUCCESS:
+            raise minc2_error("Error getting variable type for {}:{}".format(path, name))
+        return dtype[0]
+
+    def read_variable(self, path, name, data_type=None, start=None, count=None):
+        """
+        Read a variable (HDF5 dataset) as a numpy array.
+        :param path: HDF5 group path (e.g., "dimensions")
+        :param name: dataset name (e.g., "time")
+        :param data_type: minc2 type for representation (default: variable's native type)
+        :param start: start indices for hyperslab (list of int, default: origin)
+        :param count: element counts for hyperslab (list of int, default: full extent)
+        :return: numpy.ndarray
+        """
+        if isinstance(path, six.string_types):
+            path = to_bytes(path)
+        if isinstance(name, six.string_types):
+            name = to_bytes(name)
+
+        dims = self.variable_dims(path, name)
+
+        if data_type is None:
+            data_type = self.variable_type(path, name)
+
+        if data_type not in minc2_file.__minc2_to_numpy:
+            raise minc2_error("Unsupported variable data type: {}".format(data_type))
+
+        ndims = len(dims)
+
+        if start is None:
+            start = [0] * ndims
+        if count is None:
+            count = list(dims)
+
+        c_start = ffi.new("int[]", start)
+        c_count = ffi.new("int[]", count)
+
+        shape = list(count)
+        dtype = minc2_file.__minc2_to_numpy[data_type]
+        buf = np.empty(shape, dtype, 'C')
+
+        if lib.minc2_read_variable_raw(self._v, path, name, data_type,
+                                       c_start, c_count,
+                                       ffi.cast("void *", buf.ctypes.data)) != lib.MINC2_SUCCESS:
+            raise minc2_error("Error reading variable {}:{}".format(path, name))
+        return buf
+
+    def write_variable(self, path, name, data, data_type=None, start=None, count=None):
+        """
+        Write data to a variable (HDF5 dataset).
+        :param path: HDF5 group path (e.g., "dimensions")
+        :param name: dataset name (e.g., "time")
+        :param data: numpy.ndarray with data to write
+        :param data_type: minc2 type for representation (default: inferred from data.dtype)
+        :param start: start indices for hyperslab (list of int, default: origin)
+        :param count: element counts for hyperslab (list of int, default: data shape)
+        :return: None
+        """
+        import numpy as np
+
+        if isinstance(path, six.string_types):
+            path = to_bytes(path)
+        if isinstance(name, six.string_types):
+            name = to_bytes(name)
+
+        if data_type is None:
+            dtype_name = data.dtype.name
+            if dtype_name not in minc2_file.__numpy_to_minc2:
+                raise minc2_error("Unsupported numpy dtype: {}".format(dtype_name))
+            data_type = minc2_file.__numpy_to_minc2[dtype_name]
+
+        if not data.flags['C_CONTIGUOUS']:
+            data = np.ascontiguousarray(data)
+
+        ndims = len(data.shape)
+
+        if start is None:
+            start = [0] * ndims
+        if count is None:
+            count = list(data.shape)
+
+        c_start = ffi.new("int[]", start)
+        c_count = ffi.new("int[]", count)
+
+        if lib.minc2_write_variable_raw(self._v, path, name, data_type,
+                                        c_start, c_count,
+                                        ffi.cast("void *", data.ctypes.data)) != lib.MINC2_SUCCESS:
+            raise minc2_error("Error writing variable {}:{}".format(path, name))
+
 class minc2_xfm:
     """
     MINC2 .xfm file object
