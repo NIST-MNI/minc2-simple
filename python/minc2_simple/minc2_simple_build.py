@@ -109,7 +109,11 @@ def _download_libminc(dest_dir):
 
   print("Extracting ...")
   with tarfile.open(tarball, "r:gz") as tf:
-    tf.extractall(dest_dir)
+    try:
+      tf.extractall(dest_dir, filter='data')
+    except TypeError:
+      # Python < 3.12 does not support the filter parameter
+      tf.extractall(dest_dir)
   os.remove(tarball)
 
   # GitHub archives use the full commit hash; find the directory

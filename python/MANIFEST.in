@@ -1,3 +1,4 @@
 include src/*.c
 include src/*.h
-
+include README.txt
+include requirements.txt

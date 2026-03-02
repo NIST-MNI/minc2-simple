@@ -1,9 +1,5 @@
-from __future__ import print_function
-
 from ._simple import ffi,lib
 from .utils   import to_bytes,to_unicode
-from .utils   import text_type
-import six
 import sys
 import collections
 
@@ -12,7 +8,7 @@ class minc2_error(Exception):
     minc2-generated error
     """
     def __init__(self, message=""):
-        super(minc2_error, self).__init__(message)
+        super().__init__(message)
     
 
 class minc2_transform_parameters(object):
@@ -88,7 +84,7 @@ class minc2_file:
             lib.MINC2_FLOAT:  'float32',
             lib.MINC2_DOUBLE: 'float64',
         }
-    __numpy_to_minc2 = {y: x for x, y in six.iteritems(__minc2_to_numpy)}
+    __numpy_to_minc2 = {y: x for x, y in __minc2_to_numpy.items()}
 
     __minc2_to_torch = {
             lib.MINC2_BYTE:   'torch.CharTensor',
@@ -100,7 +96,7 @@ class minc2_file:
             lib.MINC2_FLOAT:  'torch.FloatTensor',
             lib.MINC2_DOUBLE: 'torch.DoubleTensor'
         }
-    __torch_to_minc2 = {y:x for x,y in six.iteritems(__minc2_to_torch)}
+    __torch_to_minc2 = {y:x for x,y in __minc2_to_torch.items()}
     
     minc2_to_numpy=__minc2_to_numpy
     numpy_to_minc2=__numpy_to_minc2
@@ -252,10 +248,10 @@ class minc2_file:
         _store_type = store_type
         _representation_type = representation_type
 
-        if isinstance(_store_type, six.string_types):
+        if isinstance(_store_type, str):
             _store_type = minc2_file.__numpy_to_minc2[_store_type]
 
-        if isinstance(_representation_type, six.string_types):
+        if isinstance(_representation_type, str):
             _representation_type = minc2_file.__numpy_to_minc2[_representation_type]
 
         if isinstance(dims, list ) or isinstance(dims,tuple):
@@ -477,9 +473,9 @@ class minc2_file:
         attr_type=ffi.new("int*",0)
         attr_length=ffi.new("int*",0)
 
-        if isinstance(group, six.string_types ):
+        if isinstance(group, str ):
             group = to_bytes(group)
-        if isinstance(attribute, six.string_types ):
+        if isinstance(attribute, str ):
             attribute = to_bytes(attribute)
 
         # assume that if we can't get attribute type, it's missing, return nil
@@ -518,12 +514,12 @@ class minc2_file:
         :param value:  attribute value
         :return:
         """
-        if isinstance(group, six.string_types ):
+        if isinstance(group, str ):
             group=to_bytes(group)
-        if isinstance(attribute, six.string_types ):
+        if isinstance(attribute, str ):
             attribute=to_bytes(attribute)
 
-        if isinstance(value, six.string_types ):
+        if isinstance(value, str ):
             value=to_bytes(value)
             attr_type=lib.MINC2_STRING
             attr_length=len(value)
@@ -531,7 +527,7 @@ class minc2_file:
             if lib.minc2_write_attribute(self._v, group, attribute, value, attr_length+1,lib.MINC2_STRING)!=lib.MINC2_SUCCESS:
                 raise minc2_error("Error writing attribute {}:{}".format(group,attribute))
 
-        elif isinstance(value, six.binary_type): # assume it's already binary encoded
+        elif isinstance(value, bytes): # assume it's already binary encoded
             attr_type = lib.MINC2_STRING
             attr_length = len(value)
 
@@ -591,8 +587,8 @@ class minc2_file:
         :param m:
         :return:
         """
-        for group,g in six.iteritems(m):
-            for attr,a in six.iteritems(g):
+        for group,g in m.items():
+            for attr,a in g.items():
                 self.write_attribute(group,attr,a)
 
     def store_dtype(self):
@@ -974,9 +970,9 @@ class minc2_file:
         :param name: dataset name (e.g., "time")
         :return: integer number of dimensions
         """
-        if isinstance(path, six.string_types):
+        if isinstance(path, str):
             path = to_bytes(path)
-        if isinstance(name, six.string_types):
+        if isinstance(name, str):
             name = to_bytes(name)
         ndims = ffi.new("int*", 0)
         if lib.minc2_get_variable_ndims(self._v, path, name, ndims) != lib.MINC2_SUCCESS:
@@ -990,9 +986,9 @@ class minc2_file:
         :param name: dataset name (e.g., "time")
         :return: list of dimension sizes
         """
-        if isinstance(path, six.string_types):
+        if isinstance(path, str):
             path = to_bytes(path)
-        if isinstance(name, six.string_types):
+        if isinstance(name, str):
             name = to_bytes(name)
         ndims = self.variable_ndims(path, name)
         dims = ffi.new("int[]", ndims)
@@ -1007,9 +1003,9 @@ class minc2_file:
         :param name: dataset name (e.g., "time")
         :return: minc2 type id (integer, use minc2_file.MINC2_FLOAT etc. for comparison)
         """
-        if isinstance(path, six.string_types):
+        if isinstance(path, str):
             path = to_bytes(path)
-        if isinstance(name, six.string_types):
+        if isinstance(name, str):
             name = to_bytes(name)
         dtype = ffi.new("int*", 0)
         if lib.minc2_get_variable_type(self._v, path, name, dtype) != lib.MINC2_SUCCESS:
@@ -1028,9 +1024,9 @@ class minc2_file:
         """
         import numpy as np
 
-        if isinstance(path, six.string_types):
+        if isinstance(path, str):
             path = to_bytes(path)
-        if isinstance(name, six.string_types):
+        if isinstance(name, str):
             name = to_bytes(name)
 
         dims = self.variable_dims(path, name)
@@ -1074,9 +1070,9 @@ class minc2_file:
         """
         import numpy as np
 
-        if isinstance(path, six.string_types):
+        if isinstance(path, str):
             path = to_bytes(path)
-        if isinstance(name, six.string_types):
+        if isinstance(name, str):
             name = to_bytes(name)
 
         if data_type is None:
@@ -1457,7 +1453,7 @@ class minc2_input_iterator:
         :param files: list of minc2 files (either minc2 objects or paths)
         :param data_type: expected data type
         """
-        if isinstance(files, six.string_types):
+        if isinstance(files, str):
             files=(files,)
 
         for f in files:
@@ -1552,7 +1548,7 @@ class minc2_output_iterator:
     def open(self,files,reference=None, data_type=None, store_type=None,slice_scaling=None, global_scaling=None,):
         self._handles=[]
 
-        if isinstance(files, six.string_types):
+        if isinstance(files, str):
             files=(files,)
 
         for f in files:
@@ -1565,7 +1561,7 @@ class minc2_output_iterator:
         if isinstance(reference, minc2_input_iterator ):
             reference = minc2_file(handle=reference._handles[0])
 
-        elif isinstance(reference, six.string_types):
+        elif isinstance(reference, str):
             reference = minc2_file(reference)
 
         if isinstance(reference, minc2_file ):
