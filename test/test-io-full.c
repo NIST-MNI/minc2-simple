@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <math.h>
 
 void print_dimension_info(struct minc2_dimension *dims)
 {
@@ -176,17 +177,36 @@ int main(int argc,char **argv)
       if(minc2_load_complete_volume(h,buffer,MINC2_DOUBLE)==MINC2_SUCCESS)
       {
         int i;
+        int f_nan=0;
+        int f_valid=0;
         diff = clock() - start;
         f_avg=0.0;
-        f_min=f_max=buffer[0];
+        f_min=f_max=0.0;
         for(i=0;i<nelement;i++)
         {
+          if(!isfinite(buffer[i]))
+          {
+            f_nan++;
+            continue;
+          }
+          if(f_valid==0)
+          {
+            f_min=f_max=buffer[i];
+          } else {
+            if(buffer[i]>f_max) f_max=buffer[i];
+            if(buffer[i]<f_min) f_min=buffer[i];
+          }
           f_avg+=buffer[i];
-          if(buffer[i]>f_max) f_max=buffer[i];
-          if(buffer[i]<f_min) f_min=buffer[i];
+          f_valid++;
         }
-        f_avg/=nelement;
-        fprintf(stdout,"Avg:%lf min:%lf max:%lf time:%ld msec\n",f_avg,f_min,f_max, (diff * 1000 / CLOCKS_PER_SEC));
+        if(f_valid>0) f_avg/=f_valid;
+        fprintf(stdout,"Avg:%lf min:%lf max:%lf nan:%d valid:%d time:%ld msec\n",
+                f_avg,f_min,f_max,f_nan,f_valid,(diff * 1000 / CLOCKS_PER_SEC));
+        if(f_nan==0)
+        {
+          fprintf(stderr,"Expected some NaN/Inf voxels, got none\n");
+          err++;
+        }
       } else {
         fprintf(stderr,"Error reading data from %s\n",argv[1]);
         err++;
@@ -207,18 +227,37 @@ int main(int argc,char **argv)
       if(minc2_load_complete_volume(h,buffer,MINC2_DOUBLE)==MINC2_SUCCESS)
       {
         int i;
+        int s_nan=0;
+        int s_valid=0;
         diff = clock() - start;
         s_avg=0.0;
-        s_min=s_max=buffer[0];
+        s_min=s_max=0.0;
         
         for(i=0;i<nelement;i++)
         {
+          if(!isfinite(buffer[i]))
+          {
+            s_nan++;
+            continue;
+          }
+          if(s_valid==0)
+          {
+            s_min=s_max=buffer[i];
+          } else {
+            if(buffer[i]>s_max) s_max=buffer[i];
+            if(buffer[i]<s_min) s_min=buffer[i];
+          }
           s_avg+=buffer[i];
-          if(buffer[i]>s_max) s_max=buffer[i];
-          if(buffer[i]<s_min) s_min=buffer[i];
+          s_valid++;
         }
-        s_avg/=nelement;
-        fprintf(stdout,"Avg:%lf min:%lf max:%lf time:%ld msec\n",s_avg,s_min,s_max, (diff * 1000 / CLOCKS_PER_SEC));
+        if(s_valid>0) s_avg/=s_valid;
+        fprintf(stdout,"Avg:%lf min:%lf max:%lf nan:%d valid:%d time:%ld msec\n",
+                s_avg,s_min,s_max,s_nan,s_valid,(diff * 1000 / CLOCKS_PER_SEC));
+        if(s_nan==0)
+        {
+          fprintf(stderr,"Expected some NaN/Inf voxels, got none\n");
+          err++;
+        }
         
         minc2_setup_standard_order(o);
         start=clock();
