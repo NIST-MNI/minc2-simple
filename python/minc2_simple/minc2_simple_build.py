@@ -209,14 +209,25 @@ def _build_libminc(src_dir, build_dir):
       "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
   ]
 
-  # Forward custom dependency locations to cmake
+  # Forward custom dependency locations to cmake.
+  # Both HDF5_ROOT and CMAKE_PREFIX_PATH are set so that cmake's
+  # find_package(HDF5) prefers the user-specified tree over any
+  # system-installed copy.
+  prefix_paths = []
+
   hdf5_dir = os.environ.get("HDF5_DIR")
   if hdf5_dir:
     configure_cmd.append("-DHDF5_ROOT={}".format(hdf5_dir))
+    prefix_paths.append(hdf5_dir)
 
   netcdf_dir = os.environ.get("NETCDF_DIR")
   if netcdf_dir:
     configure_cmd.append("-DNETCDF_ROOT={}".format(netcdf_dir))
+    prefix_paths.append(netcdf_dir)
+
+  if prefix_paths:
+    configure_cmd.append(
+        "-DCMAKE_PREFIX_PATH={}".format(";".join(prefix_paths)))
 
   print("Configuring libminc ...")
   print("  " + " ".join(configure_cmd))
@@ -242,27 +253,24 @@ def _setup_preinstalled(prefix):
   libraries = ["minc2"]
   extra_objects = []
 
-  # HDF5 includes may be needed even with a pre-installed libminc,
-  # because minc2.h includes <hdf5.h>
-  hdf5_inc = os.path.join(prefix, "include", "hdf5.h")
-  if not os.path.isfile(hdf5_inc):
-    include_dirs += _find_hdf5_includes()
+  # HDF5 includes are needed because minc2.h includes <hdf5.h>.
+  # When HDF5_DIR is set its paths must appear *before* the libminc
+  # prefix so the user's HDF5 takes precedence over any copy that may
+  # be bundled inside the libminc install tree.
+  hdf5_incs = _find_hdf5_includes()
+  if hdf5_incs:
+    include_dirs = hdf5_incs + include_dirs
+  elif not os.path.isfile(os.path.join(prefix, "include", "hdf5.h")):
+    print("WARNING: could not locate hdf5.h (set HDF5_DIR?)")
 
-  # rpath so the shared library is found at runtime
+  # Library dirs and rpath — HDF5_DIR lib dirs go first so the linker
+  # prefers them over anything in the libminc prefix.
+  hdf5_lib_dirs, _ = _find_hdf5_link()
+  if hdf5_lib_dirs:
+    library_dirs = hdf5_lib_dirs + library_dirs
+
   extra_link_args = []
-  rpath_dirs = [os.path.join(prefix, "lib")]
-
-  # If HDF5 is in a non-standard location, add its lib dir for rpath too
-  hdf5_dir = os.environ.get("HDF5_DIR")
-  if hdf5_dir:
-    for d in [os.path.join(hdf5_dir, "lib"),
-              os.path.join(hdf5_dir, "lib64")]:
-      if os.path.isdir(d) and any(
-          f.startswith("libhdf5") for f in os.listdir(d)):
-        library_dirs.append(d)
-        rpath_dirs.append(d)
-        break
-
+  rpath_dirs = hdf5_lib_dirs + [os.path.join(prefix, "lib")]
   for d in rpath_dirs:
     if platform == "linux" or platform == "linux2":
       extra_link_args.append("-Wl,-rpath={}".format(d))
@@ -286,16 +294,18 @@ def _setup_autobuild():
   build_dir = os.path.join(base_dir, "build")
   libminc_a = _build_libminc(src_dir, build_dir)
 
-  # Include dirs from the source tree
-  include_dirs = [
+  # HDF5 includes first so HDF5_DIR takes precedence over any system
+  # headers that might be found via the default include search path.
+  include_dirs = _find_hdf5_includes()
+  # Then libminc source-tree includes
+  include_dirs += [
       os.path.join(src_dir, "libsrc2"),
       os.path.join(src_dir, "libcommon"),
       os.path.join(src_dir, "volume_io", "Include"),
   ]
-  # HDF5 includes
-  include_dirs += _find_hdf5_includes()
 
   # Link flags: static libminc2 + dynamic HDF5/ZLIB/system
+  # HDF5_DIR lib dirs come first in library_dirs.
   hdf5_lib_dirs, hdf5_libs = _find_hdf5_link()
   libraries = hdf5_libs + ["z", "m"]
   if platform == "linux" or platform == "linux2":
