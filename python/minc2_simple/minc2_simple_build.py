@@ -5,9 +5,14 @@ Locates libminc in one of three ways (checked in order):
   1. LIBMINC_DIR  env var  -- path to a libminc install or build tree
   2. MINC_TOOLKIT env var  -- path to a full MINC Toolkit install
   3. Auto-build            -- downloads libminc source from GitHub and
-                             builds a minimal static libminc2.a
+                            builds a minimal static libminc2.a
 
 Auto-build requires: cmake, a C compiler, HDF5-dev, and zlib-dev.
+
+Optional environment variables for custom dependency locations:
+  HDF5_DIR     -- root of an HDF5 installation (expects include/ and lib/)
+  NETCDF_DIR   -- root of a NetCDF installation (forwarded to cmake when
+                  auto-building with MINC1 support)
 """
 
 import os
@@ -30,8 +35,23 @@ _LIBMINC_COMMIT = "d2a0f474"
 # ── helpers ─────────────────────────────────────────────────────────────
 
 def _find_hdf5_includes():
-  """Return a list of include directories for HDF5 headers."""
+  """Return a list of include directories for HDF5 headers.
+
+  Checks HDF5_DIR env var first, then pkg-config, then common paths.
+  """
   dirs = []
+
+  # 1. HDF5_DIR environment variable
+  hdf5_dir = os.environ.get("HDF5_DIR")
+  if hdf5_dir:
+    inc = os.path.join(hdf5_dir, "include")
+    if os.path.isfile(os.path.join(inc, "hdf5.h")):
+      return [inc]
+    # Warn but fall through to other methods
+    print("WARNING: HDF5_DIR={} set but hdf5.h not found in {}/".format(
+        hdf5_dir, inc))
+
+  # 2. pkg-config
   try:
     cflags = subprocess.check_output(
         ["pkg-config", "--cflags", "hdf5"],
@@ -41,6 +61,8 @@ def _find_hdf5_includes():
         dirs.append(flag[2:])
   except (subprocess.CalledProcessError, FileNotFoundError):
     pass
+
+  # 3. Common system paths
   if not dirs:
     for p in ["/usr/include/hdf5/serial", "/usr/include"]:
       if os.path.exists(os.path.join(p, "hdf5.h")):
@@ -50,9 +72,29 @@ def _find_hdf5_includes():
 
 
 def _find_hdf5_link():
-  """Return (library_dirs, libraries, extra_link_args) for HDF5."""
+  """Return (library_dirs, libraries) for HDF5.
+
+  Checks HDF5_DIR env var first, then pkg-config, then common paths.
+  """
   lib_dirs = []
   libs = []
+
+  # 1. HDF5_DIR environment variable
+  hdf5_dir = os.environ.get("HDF5_DIR")
+  if hdf5_dir:
+    lib = os.path.join(hdf5_dir, "lib")
+    if os.path.isdir(lib) and any(
+        f.startswith("libhdf5") for f in os.listdir(lib)):
+      return [lib], ["hdf5"]
+    # Also check lib64
+    lib64 = os.path.join(hdf5_dir, "lib64")
+    if os.path.isdir(lib64) and any(
+        f.startswith("libhdf5") for f in os.listdir(lib64)):
+      return [lib64], ["hdf5"]
+    print("WARNING: HDF5_DIR={} set but no HDF5 libraries found".format(
+        hdf5_dir))
+
+  # 2. pkg-config
   try:
     raw = subprocess.check_output(
         ["pkg-config", "--libs", "hdf5"],
@@ -64,6 +106,8 @@ def _find_hdf5_link():
         libs.append(flag[2:])
   except (subprocess.CalledProcessError, FileNotFoundError):
     pass
+
+  # 3. Common system paths
   if not libs:
     libs = ["hdf5"]
     for p in ["/usr/lib/x86_64-linux-gnu/hdf5/serial",
@@ -165,6 +209,15 @@ def _build_libminc(src_dir, build_dir):
       "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
   ]
 
+  # Forward custom dependency locations to cmake
+  hdf5_dir = os.environ.get("HDF5_DIR")
+  if hdf5_dir:
+    configure_cmd.append("-DHDF5_ROOT={}".format(hdf5_dir))
+
+  netcdf_dir = os.environ.get("NETCDF_DIR")
+  if netcdf_dir:
+    configure_cmd.append("-DNETCDF_ROOT={}".format(netcdf_dir))
+
   print("Configuring libminc ...")
   print("  " + " ".join(configure_cmd))
   subprocess.check_call(configure_cmd)
@@ -197,11 +250,24 @@ def _setup_preinstalled(prefix):
 
   # rpath so the shared library is found at runtime
   extra_link_args = []
-  libdir = os.path.join(prefix, "lib")
-  if platform == "linux" or platform == "linux2":
-    extra_link_args = ["-Wl,-rpath={}".format(libdir)]
-  elif platform == "darwin":
-    extra_link_args = ["-Xlinker", "-rpath", "-Xlinker", libdir]
+  rpath_dirs = [os.path.join(prefix, "lib")]
+
+  # If HDF5 is in a non-standard location, add its lib dir for rpath too
+  hdf5_dir = os.environ.get("HDF5_DIR")
+  if hdf5_dir:
+    for d in [os.path.join(hdf5_dir, "lib"),
+              os.path.join(hdf5_dir, "lib64")]:
+      if os.path.isdir(d) and any(
+          f.startswith("libhdf5") for f in os.listdir(d)):
+        library_dirs.append(d)
+        rpath_dirs.append(d)
+        break
+
+  for d in rpath_dirs:
+    if platform == "linux" or platform == "linux2":
+      extra_link_args.append("-Wl,-rpath={}".format(d))
+    elif platform == "darwin":
+      extra_link_args += ["-Xlinker", "-rpath", "-Xlinker", d]
 
   return dict(
       include_dirs=include_dirs,
