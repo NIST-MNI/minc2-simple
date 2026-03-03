@@ -5,12 +5,16 @@ import sys
 
 from setuptools import setup, find_packages
 
-os.chdir(os.path.dirname(sys.argv[0]) or ".")
+_HERE = os.path.dirname(os.path.abspath(__file__))
+os.chdir(_HERE)
 
 print(find_packages())
 
-with open("README.txt", "rt") as f:
-    long_description = f.read()
+_readme = os.path.join(_HERE, "README.txt")
+long_description = ""
+if os.path.isfile(_readme):
+    with open(_readme, "rt") as f:
+        long_description = f.read()
 
 setup(
     name = "minc2_simple",
