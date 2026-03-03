@@ -573,11 +573,20 @@ class minc2_file:
 
         lib.minc2_stop_info_iterator(group_iterator)
 
-        # special attributes
+        # special attributes, might not be present, but we want to have them in a special place in the dict if they are
         ret['']={}
-        ret['']['history']=self.read_attribute('', 'history')
-        ret['']['ident']=self.read_attribute('', 'ident')
-        ret['']['minc_version']=self.read_attribute('', 'minc_version')
+        try:
+            ret['']['history']=self.read_attribute('', 'history')
+        except minc2_error:
+            pass
+        try:
+            ret['']['ident']=self.read_attribute('', 'ident')
+        except minc2_error:
+            pass
+        try:
+            ret['']['minc_version']=self.read_attribute('', 'minc_version')
+        except minc2_error:
+            pass
 
         return ret
 
