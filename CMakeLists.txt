@@ -37,14 +37,30 @@ endif()
 FIND_PACKAGE( LIBMINC REQUIRED HINTS ${_libminc_hints})
 
 # Resolve the libminc target name:
-#  - installed libminc provides LIBMINC::minc2 (via NAMESPACE in install(EXPORT))
-#  - build-tree libminc provides minc2 (no namespace)
+#  - installed libminc (modernize_cmake) provides LIBMINC::minc2
+#  - build-tree libminc (modernize_cmake) provides minc2
+#  - older (released) libminc provides only variables, no targets
 if(TARGET LIBMINC::minc2)
   set(LIBMINC_TARGET LIBMINC::minc2)
 elseif(TARGET minc2)
   set(LIBMINC_TARGET minc2)
+elseif(LIBMINC_FOUND AND DEFINED LIBMINC_LIBRARIES)
+  # Legacy libminc: create an imported target from the old-style variables
+  message(STATUS "Creating LIBMINC::minc2 imported target from legacy variables")
+  add_library(LIBMINC::minc2 INTERFACE IMPORTED)
+  set_target_properties(LIBMINC::minc2 PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${LIBMINC_INCLUDE_DIRS}"
+    INTERFACE_LINK_LIBRARIES      "${LIBMINC_LIBRARIES}"
+  )
+  if(DEFINED LIBMINC_LIBRARY_DIRS)
+    set_property(TARGET LIBMINC::minc2 APPEND PROPERTY
+      INTERFACE_LINK_DIRECTORIES "${LIBMINC_LIBRARY_DIRS}")
+  endif()
+  set(LIBMINC_TARGET LIBMINC::minc2)
 else()
-  message(FATAL_ERROR "LIBMINC found but neither LIBMINC::minc2 nor minc2 target exists")
+  message(FATAL_ERROR
+    "LIBMINC found but no imported targets or legacy variables are available.\n"
+    "Set LIBMINC_DIR to a libminc build tree or install prefix.")
 endif()
 
 OPTION(BUILD_EXAMPLES "Build examples." OFF)
