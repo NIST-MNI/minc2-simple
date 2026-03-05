@@ -11,7 +11,7 @@ ADD_EXECUTABLE(test-io-iterator   test-io-iterator.c)
 TARGET_LINK_LIBRARIES(test-io-iterator minc2-simple)
 
 ADD_EXECUTABLE(test-nan     test-nan.c)
-TARGET_LINK_LIBRARIES(test-nan minc2-simple)
+TARGET_LINK_LIBRARIES(test-nan minc2-simple m)
 
 ADD_EXECUTABLE(test-tags     test-tags.c)
 TARGET_LINK_LIBRARIES(test-tags minc2-simple)

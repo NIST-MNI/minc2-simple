@@ -85,4 +85,41 @@ IF(BUILD_TESTING)
     ADD_SUBDIRECTORY(test)
 ENDIF(BUILD_TESTING)
 
+# ── Package export ──────────────────────────────────────────────────────
+include(CMakePackageConfigHelpers)
+
+set(MINC2_SIMPLE_INCLUDE_DIR include)
+
+configure_package_config_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/minc2-simpleConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/minc2-simpleConfig.cmake
+  INSTALL_DESTINATION lib/cmake/minc2-simple
+  PATH_VARS MINC2_SIMPLE_INCLUDE_DIR
+)
+
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/minc2-simpleConfigVersion.cmake
+  VERSION 1.0.0
+  COMPATIBILITY AnyNewerVersion
+)
+
+install(
+  EXPORT minc2-simple-targets
+  NAMESPACE MINC2_SIMPLE::
+  DESTINATION lib/cmake/minc2-simple
+)
+
+install(
+  FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/minc2-simpleConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/minc2-simpleConfigVersion.cmake
+  DESTINATION lib/cmake/minc2-simple
+)
+
+# Build-tree export so the build directory can be used directly
+export(EXPORT minc2-simple-targets
+  FILE ${CMAKE_CURRENT_BINARY_DIR}/minc2-simple-targets.cmake
+  NAMESPACE MINC2_SIMPLE::
+)
+
 #kate: indent-width 2; replace-tabs on; 

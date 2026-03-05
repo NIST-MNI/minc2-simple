@@ -1,0 +1,42 @@
+# minc2-simpleConfig.cmake — installed package configuration
+#
+# Provides:
+#   Modern imported targets:
+#     MINC2_SIMPLE::minc2-simple        — shared library (if built)
+#     MINC2_SIMPLE::minc2-simple-static — static library (if built)
+#
+#   Legacy variables (backward compatibility):
+#     MINC2_SIMPLE_FOUND
+#     MINC2_SIMPLE_INCLUDE_DIRS
+#     MINC2_SIMPLE_LIBRARIES
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# ----- Resolve transitive dependencies -----
+# LIBMINC is required; its config in turn finds HDF5, ZLIB, etc.
+find_dependency(LIBMINC REQUIRED)
+
+# Belt-and-suspenders: ensure HDF5 includes are available even when
+# libminc's install-tree export does not propagate them through targets.
+set(HDF5_NO_FIND_PACKAGE_CONFIG_FILE ON)
+find_dependency(HDF5 REQUIRED COMPONENTS C)
+
+# ----- Import the exported targets -----
+if(NOT TARGET MINC2_SIMPLE::minc2-simple AND
+   NOT TARGET MINC2_SIMPLE::minc2-simple-static)
+  include("${CMAKE_CURRENT_LIST_DIR}/minc2-simple-targets.cmake")
+endif()
+
+# ----- Legacy variables (backward compatibility) -----
+set_and_check(MINC2_SIMPLE_INCLUDE_DIRS "@PACKAGE_MINC2_SIMPLE_INCLUDE_DIR@")
+
+# Prefer the shared target; fall back to static
+if(TARGET MINC2_SIMPLE::minc2-simple)
+  set(MINC2_SIMPLE_LIBRARIES MINC2_SIMPLE::minc2-simple)
+elseif(TARGET MINC2_SIMPLE::minc2-simple-static)
+  set(MINC2_SIMPLE_LIBRARIES MINC2_SIMPLE::minc2-simple-static)
+endif()
+
+set(MINC2_SIMPLE_FOUND 1)
