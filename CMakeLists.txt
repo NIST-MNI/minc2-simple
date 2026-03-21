@@ -28,7 +28,16 @@ if(DEFINED LIBMINC_DIR)
   )
 endif()
 
-# Backward-compatible MINC_TOOLKIT_DIR detection
+# Direct hints from MINC_TOOLKIT env var (conda/custom installs without mincstats)
+if(DEFINED ENV{MINC_TOOLKIT})
+  list(APPEND _libminc_hints
+    "$ENV{MINC_TOOLKIT}"
+    "$ENV{MINC_TOOLKIT}/lib"
+    "$ENV{MINC_TOOLKIT}/lib/cmake"
+  )
+endif()
+
+# Backward-compatible MINC_TOOLKIT_DIR detection (full toolkit with mincstats)
 FIND_PATH( MINC_TOOLKIT_DIR bin/mincstats  HINTS $ENV{MINC_TOOLKIT} DOC "minc-toolkit install prefix")
 if(MINC_TOOLKIT_DIR)
   list(APPEND _libminc_hints "${MINC_TOOLKIT_DIR}/lib${LIB_SUFFIX}")

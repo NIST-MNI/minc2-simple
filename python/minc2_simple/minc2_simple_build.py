@@ -1,11 +1,12 @@
 """
 CFFI build script for minc2_simple.
 
-Locates libminc in one of three ways (checked in order):
-  1. LIBMINC_DIR  env var  -- path to a libminc install or build tree
-  2. MINC_TOOLKIT env var  -- path to a full MINC Toolkit install
-  3. Auto-build            -- downloads libminc source from GitHub and
-                            builds a minimal static libminc2.a
+Locates libminc in one of four ways (checked in order):
+  1. LIBMINC_DIR   env var  -- path to a libminc install or build tree
+  2. MINC_TOOLKIT  env var  -- path to a full MINC Toolkit install
+  3. CONDA_PREFIX / sys.prefix -- active conda or venv with libminc installed
+  4. Auto-build             -- downloads libminc source from GitHub and
+                             builds a minimal static libminc2.a
 
 Auto-build requires: cmake, a C compiler, HDF5-dev, and zlib-dev.
 
@@ -128,6 +129,87 @@ def _has_libminc(prefix):
   lib_dylib = os.path.join(prefix, "lib", "libminc2.dylib")
   return os.path.isfile(inc) and (
       os.path.isfile(lib_so) or os.path.isfile(lib_a) or os.path.isfile(lib_dylib))
+
+
+# Well-known symbols that libminc2 calls when built with each optional library.
+# Used to detect static-linking dependencies in .a archives.
+_LIBMINC_PROBE_SYMBOLS = {
+  "libhdf5":   [b"H5Fopen", b"H5Dread", b"H5Gcreate"],
+  "libnetcdf": [b"nc_open", b"ncopen",  b"ncdimid"],
+}
+
+
+def _so_needs(data, libname):
+  """Return True if the ELF/Mach-O binary *data* has a DT_NEEDED /
+  LC_LOAD_DYLIB entry whose base name starts with *libname* followed by
+  '.', '-', or end-of-token (e.g. 'libnetcdf' matches 'libnetcdf.so.22').
+  """
+  needle = libname.encode()
+  idx = 0
+  while True:
+    idx = data.find(needle, idx)
+    if idx < 0:
+      return False
+    end = data.find(b"\x00", idx)
+    rest = data[idx + len(needle):end]
+    if rest == b"" or rest[:1] in (b".", b"-"):
+      return True
+    idx += 1
+
+
+def _archive_needs(data, libname):
+  """Return True if any object file inside the ar archive *data* has an
+  undefined external reference to a well-known symbol from *libname*.
+
+  Strategy: scan the raw archive bytes for null-terminated symbol names
+  from the probe set.  These names live in ELF .strtab sections of the
+  embedded .o members and cannot appear as false positives (libminc2
+  source code never defines symbols named H5Fopen, nc_open, etc.).
+  """
+  probes = _LIBMINC_PROBE_SYMBOLS.get(libname, [])
+  for sym in probes:
+    if sym + b"\x00" in data:
+      return True
+  return False
+
+
+def _libminc_needs(prefix, libname):
+  """Return True if libminc2 in *prefix* requires *libname* as a link
+  dependency.
+
+  * Shared library (.so / .dylib): checks DT_NEEDED / LC_LOAD_DYLIB
+    entries — covers both dynamic and externally-static builds.
+  * Static archive (.a, no shared lib present): scans object members for
+    undefined references to well-known symbols from *libname*.
+
+  No external tools are required.
+  """
+  for candidate in ("libminc2.so", "libminc2.dylib"):
+    lib_path = os.path.join(prefix, "lib", candidate)
+    if not os.path.isfile(lib_path):
+      continue
+    try:
+      with open(lib_path, "rb") as f:
+        data = f.read()
+      if _so_needs(data, libname):
+        return True
+      # Shared lib present but libname not in DT_NEEDED → statically
+      # embedded inside libminc2.so, no external linking needed.
+      return False
+    except OSError:
+      pass
+
+  # No shared lib — check static archive.
+  lib_a = os.path.join(prefix, "lib", "libminc2.a")
+  if os.path.isfile(lib_a):
+    try:
+      with open(lib_a, "rb") as f:
+        data = f.read()
+      return _archive_needs(data, libname)
+    except OSError:
+      pass
+
+  return False
 
 
 def _download_libminc(dest_dir):
@@ -253,21 +335,45 @@ def _setup_preinstalled(prefix):
   libraries = ["minc2"]
   extra_objects = []
 
-  # HDF5 includes are needed because minc2.h includes <hdf5.h>.
-  # When HDF5_DIR is set its paths must appear *before* the libminc
-  # prefix so the user's HDF5 takes precedence over any copy that may
-  # be bundled inside the libminc install tree.
-  hdf5_incs = _find_hdf5_includes()
+  # HDF5: minc2-simple.c includes <hdf5.h> directly, so we must link
+  # against libhdf5 explicitly — transitive linkage via libminc2 is not
+  # sufficient for data symbols like H5T_STD_U16LE_g.
+  # Priority:
+  #   1. HDF5_DIR env var (explicit user override)
+  #   2. HDF5 co-installed in the same prefix as libminc (conda / toolkit)
+  #   3. System-wide search via pkg-config / common paths (last resort)
+  hdf5_dir = os.environ.get("HDF5_DIR")
+  if hdf5_dir:
+    hdf5_incs = _find_hdf5_includes()   # respects HDF5_DIR
+    hdf5_lib_dirs, hdf5_libs = _find_hdf5_link()
+  elif os.path.isfile(os.path.join(prefix, "include", "hdf5.h")):
+    # HDF5 lives in the same tree as libminc — use it exclusively.
+    hdf5_incs = []          # already covered by include_dirs above
+    hdf5_lib_dirs = []      # already covered by library_dirs above
+    hdf5_libs = ["hdf5"]
+  else:
+    # HDF5 not in the libminc prefix; fall back to system search.
+    hdf5_incs = _find_hdf5_includes()
+    hdf5_lib_dirs, hdf5_libs = _find_hdf5_link()
+    if not hdf5_incs:
+      print("WARNING: could not locate hdf5.h (set HDF5_DIR?)")
+
+  libraries += hdf5_libs
   if hdf5_incs:
     include_dirs = hdf5_incs + include_dirs
-  elif not os.path.isfile(os.path.join(prefix, "include", "hdf5.h")):
-    print("WARNING: could not locate hdf5.h (set HDF5_DIR?)")
-
-  # Library dirs and rpath — HDF5_DIR lib dirs go first so the linker
-  # prefers them over anything in the libminc prefix.
-  hdf5_lib_dirs, _ = _find_hdf5_link()
   if hdf5_lib_dirs:
     library_dirs = hdf5_lib_dirs + library_dirs
+
+  # NetCDF: only link if libminc2 was actually built with MINC1/NetCDF
+  # support (i.e. has a DT_NEEDED entry for libnetcdf).
+  if _libminc_needs(prefix, "libnetcdf"):
+    netcdf_dir = os.environ.get("NETCDF_DIR")
+    if netcdf_dir:
+      netcdf_lib = os.path.join(netcdf_dir, "lib")
+      if os.path.isdir(netcdf_lib):
+        library_dirs.append(netcdf_lib)
+    # else: netcdf is expected in the same prefix, already in library_dirs
+    libraries.append("netcdf")
 
   extra_link_args = []
   rpath_dirs = hdf5_lib_dirs + [os.path.join(prefix, "lib")]
@@ -353,7 +459,16 @@ def _resolve_libminc():
     print("Using libminc from default path {}".format(default_prefix))
     return _setup_preinstalled(default_prefix)
 
-  # 4. Auto-build
+  # 4. Active conda/venv environment (CONDA_PREFIX or sys.prefix)
+  for env_prefix in filter(None, [
+      os.environ.get("CONDA_PREFIX"),
+      sys.prefix if sys.prefix != sys.base_prefix else None,
+  ]):
+    if _has_libminc(env_prefix):
+      print("Using libminc from Python env prefix {}".format(env_prefix))
+      return _setup_preinstalled(env_prefix)
+
+  # 5. Auto-build
   if libminc_dir:
     print("WARNING: LIBMINC_DIR={} set but libminc not found there".format(
         libminc_dir))
