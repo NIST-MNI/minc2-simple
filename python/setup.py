@@ -18,7 +18,7 @@ if os.path.isfile(_readme):
 
 setup(
     name = "minc2_simple",
-    version="0.2.31",
+    version="0.2.40",
     description="MINC2 Simple interface using CFFI",
     long_description=long_description,
     url="https://github.com/vfonov/minc2_simple",
@@ -27,7 +27,6 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
@@ -37,7 +36,7 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     packages=find_packages(),
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     install_requires=["cffi>=1.0.0"],
     cffi_modules=[
         "minc2_simple/minc2_simple_build.py:ffibuilder",
