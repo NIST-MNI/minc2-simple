@@ -489,7 +489,12 @@ print("*******************")
 cfg = _resolve_libminc()
 
 _extra_compile_args = []
-_extra_link_args = cfg["extra_link_args"]
+_extra_link_args = list(cfg["extra_link_args"])
+
+# UBSAN support via MINC2_SIMPLE_UBSAN env var
+if os.environ.get("MINC2_SIMPLE_UBSAN", "").lower() in ("1", "on", "true"):
+    _extra_compile_args.append("-fsanitize=undefined")
+    _extra_link_args.append("-fsanitize=undefined")
 
 # Read minc2-simple C sources and header
 minc2_simple_src = ""

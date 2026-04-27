@@ -80,9 +80,15 @@ OPTION(BUILD_MINC2_SIMPLE_STATIC "Build static library" ON)
 
 ENABLE_TESTING()
 
+OPTION(MINC2_SIMPLE_USE_UBSAN "Build with UndefinedBehavior Sanitizer" OFF)
+
 SET(CMAKE_MACOSX_RPATH ON)
 SET(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX})
 
+if(MINC2_SIMPLE_USE_UBSAN)
+  add_compile_options(-fno-omit-frame-pointer -fsanitize=undefined)
+  add_link_options(-fno-omit-frame-pointer -fsanitize=undefined)
+endif()
 
 ADD_SUBDIRECTORY(src)
 
