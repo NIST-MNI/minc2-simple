@@ -278,6 +278,19 @@ static int _minc2_open_with_mode(minc2_file_handle h, const char * path, int mod
         return MINC2_ERROR;
       }
       h->store_dims[h->ndims-i-1].offsets=offs;
+
+      /* Per-sample widths (FWHM) for irregularly-sampled dimensions. */
+      double *wids=(double*)malloc(n*sizeof(double));
+      if(!wids) {
+        MI_LOG_ERROR(MI2_MSG_GENERIC,"Out of memory allocating dim widths");
+        return MINC2_ERROR;
+      }
+      if(miget_dimension_widths(h->file_dims[i],MI_ORDER_FILE,n,0,wids)!=MI_NOERROR) {
+        free(wids);
+        MI_LOG_ERROR(MI2_MSG_GENERIC,"Can't get dimension widths");
+        return MINC2_ERROR;
+      }
+      h->store_dims[h->ndims-i-1].widths=wids;
     }
     
     if(!strcmp(name,MIxspace) || !strcmp(name,MIxfrequency) ) /*this is X space*/
@@ -316,8 +329,9 @@ static int _minc2_open_with_mode(minc2_file_handle h, const char * path, int mod
   /*copy store to reprenetation dimension*/
   memcpy(h->representation_dims,h->store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
 
-  /* Deep-copy any irregular offsets so store_dims and representation_dims
-     own independent allocations (otherwise cleanup would double-free). */
+  /* Deep-copy any irregular offsets/widths so store_dims and
+     representation_dims own independent allocations (otherwise cleanup
+     would double-free). */
   for(i=0; i<h->ndims; i++) {
     if(h->store_dims[i].offsets!=NULL) {
       double *dup=(double*)malloc(h->store_dims[i].length*sizeof(double));
@@ -328,6 +342,16 @@ static int _minc2_open_with_mode(minc2_file_handle h, const char * path, int mod
       memcpy(dup,h->store_dims[i].offsets,
              h->store_dims[i].length*sizeof(double));
       h->representation_dims[i].offsets=dup;
+    }
+    if(h->store_dims[i].widths!=NULL) {
+      double *dup_w=(double*)malloc(h->store_dims[i].length*sizeof(double));
+      if(!dup_w) {
+        MI_LOG_ERROR(MI2_MSG_GENERIC,"Out of memory copying dim widths");
+        return MINC2_ERROR;
+      }
+      memcpy(dup_w,h->store_dims[i].widths,
+             h->store_dims[i].length*sizeof(double));
+      h->representation_dims[i].widths=dup_w;
     }
   }
 
@@ -495,14 +519,18 @@ int minc2_setup_standard_order(minc2_file_handle h)
     }
   }
   
-  /* The struct copy below would alias offsets pointers between
+  /* The struct copy below would alias offsets/widths pointers between
      store_dims and representation_dims, which then double-free at
-     cleanup. Drop any offsets we currently own on representation_dims
+     cleanup. Drop any offsets/widths we currently own on representation_dims
      before rebuilding it, and deep-copy from store_dims where needed. */
   for(i=0; i<h->ndims; i++) {
     if(h->representation_dims[i].offsets) {
       free(h->representation_dims[i].offsets);
       h->representation_dims[i].offsets=NULL;
+    }
+    if(h->representation_dims[i].widths) {
+      free(h->representation_dims[i].widths);
+      h->representation_dims[i].widths=NULL;
     }
   }
 
@@ -518,7 +546,7 @@ int minc2_setup_standard_order(minc2_file_handle h)
         miset_dimension_apparent_voxel_order(h->apparent_dims[h->ndims-1-usable_dimensions],MI_POSITIVE);
 
       h->representation_dims[usable_dimensions] = h->store_dims[dimension_indeces[i]];
-      /* Deep-copy offsets so the assignment above doesn't leave us
+      /* Deep-copy offsets/widths so the assignment above doesn't leave us
          aliasing the store_dims allocation. */
       if(h->store_dims[dimension_indeces[i]].offsets!=NULL) {
         misize_t bytes = h->store_dims[dimension_indeces[i]].length*sizeof(double);
@@ -529,6 +557,16 @@ int minc2_setup_standard_order(minc2_file_handle h)
         }
         memcpy(dup, h->store_dims[dimension_indeces[i]].offsets, bytes);
         h->representation_dims[usable_dimensions].offsets = dup;
+      }
+      if(h->store_dims[dimension_indeces[i]].widths!=NULL) {
+        misize_t bytes_w = h->store_dims[dimension_indeces[i]].length*sizeof(double);
+        double *dup_w = (double*)malloc(bytes_w);
+        if(!dup_w) {
+          MI_LOG_ERROR(MI2_MSG_GENERIC,"Out of memory in setup_standard_order");
+          return MINC2_ERROR;
+        }
+        memcpy(dup_w, h->store_dims[dimension_indeces[i]].widths, bytes_w);
+        h->representation_dims[usable_dimensions].widths = dup_w;
       }
 
       miget_dimension_separation(h->apparent_dims[h->ndims-1-usable_dimensions],MI_ORDER_APPARENT,&h->representation_dims[usable_dimensions].step);
@@ -905,10 +943,12 @@ int minc2_compare_dimensions(const struct minc2_dimension *one,const struct minc
           return MINC2_ERROR;
     }
 
-    /* For irregular dims, the per-sample offsets are part of the
-       identity. If both sides have offsets, compare element-wise; if
+    /* For irregular dims, the per-sample offsets and widths are part of
+       the identity. If both sides have them, compare element-wise; if
        exactly one side has them populated we treat the dims as unequal
-       (the irregular flag matched but the data is missing). */
+       (the irregular flag matched but the data is missing). Comparison
+       is gated on `irregular` only; for regular dims any stray
+       offsets/widths pointers are deliberately ignored. */
     if(one->irregular)
     {
       if((one->offsets==NULL)!=(two->offsets==NULL))
@@ -917,6 +957,15 @@ int minc2_compare_dimensions(const struct minc2_dimension *one,const struct minc
       {
         for(i=0;i<one->length;i++)
           if(fabs(one->offsets[i]-two->offsets[i])>1e-6)
+            return MINC2_ERROR;
+      }
+
+      if((one->widths==NULL)!=(two->widths==NULL))
+        return MINC2_ERROR;
+      if(one->widths!=NULL && two->widths!=NULL)
+      {
+        for(i=0;i<one->length;i++)
+          if(fabs(one->widths[i]-two->widths[i])>1e-6)
             return MINC2_ERROR;
       }
     }
@@ -966,10 +1015,19 @@ int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int st
   memcpy(h->store_dims         ,store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
   memcpy(h->representation_dims,store_dims,sizeof(struct minc2_dimension)*(h->ndims+1));
 
-  /* Caller-supplied offsets pointers point into caller memory we don't
-     own. Deep-copy them so the facade owns its own arrays (and so the
-     cleanup code can blindly free both store_dims and representation_dims
-     without touching caller memory). */
+  /* The memcpy above shallow-copied caller-supplied offsets/widths
+     pointers into every entry. Scrub them all to NULL up-front so that
+     a mid-loop OOM bail (below) never leaves cleanup with aliased
+     caller-owned pointers to free. */
+  for(i=0;i<h->ndims;i++) {
+    h->store_dims[i].offsets         = NULL;
+    h->representation_dims[i].offsets = NULL;
+    h->store_dims[i].widths          = NULL;
+    h->representation_dims[i].widths  = NULL;
+  }
+
+  /* Deep-copy caller-supplied irregular offsets/widths so the facade
+     owns its own arrays. */
   for(i=0;i<h->ndims;i++) {
     if(store_dims[i].irregular && store_dims[i].offsets!=NULL) {
       misize_t bytes=store_dims[i].length*sizeof(double);
@@ -984,12 +1042,23 @@ int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int st
       memcpy(dup_r,store_dims[i].offsets,bytes);
       h->store_dims[i].offsets=dup_s;
       h->representation_dims[i].offsets=dup_r;
-    } else {
-      h->store_dims[i].offsets=NULL;
-      h->representation_dims[i].offsets=NULL;
+    }
+    if(store_dims[i].irregular && store_dims[i].widths!=NULL) {
+      misize_t bytes_w=store_dims[i].length*sizeof(double);
+      double *dup_ws=(double*)malloc(bytes_w);
+      double *dup_wr=(double*)malloc(bytes_w);
+      if(!dup_ws || !dup_wr) {
+        free(dup_ws); free(dup_wr);
+        MI_LOG_ERROR(MI2_MSG_GENERIC,"Out of memory copying define-time widths");
+        return MINC2_ERROR;
+      }
+      memcpy(dup_ws,store_dims[i].widths,bytes_w);
+      memcpy(dup_wr,store_dims[i].widths,bytes_w);
+      h->store_dims[i].widths=dup_ws;
+      h->representation_dims[i].widths=dup_wr;
     }
   }
-  
+
   for(dim=store_dims,i=0;dim->id!=MINC2_DIM_END;dim++,i++)
   {
     switch(dim->id)
@@ -1032,13 +1101,18 @@ int minc2_define(minc2_file_handle h, struct minc2_dimension *store_dims, int st
     miset_dimension_separation(h->file_dims[ndims-i-1],dim->step );
     if(dim->have_dir_cos)
       miset_dimension_cosines( h->file_dims[ndims-i-1],dim->dir_cos);
-    /* Persist per-sample offsets for irregular dims. Must happen before
-       micreate_volume (called later from minc2_create), otherwise libminc
-       will not accept the irregular dim. The caller-supplied buffer is
-       only read by miset_dimension_offsets — we don't take ownership. */
+    /* Persist per-sample offsets/widths for irregular dims. Must happen
+       before micreate_volume (called later from minc2_create), otherwise
+       libminc will not accept the irregular dim. The caller-supplied
+       buffers are only read by miset_dimension_* — we don't take
+       ownership. */
     if(dim->irregular && dim->offsets!=NULL) {
       miset_dimension_offsets(h->file_dims[ndims-i-1],
                               dim->length, 0, dim->offsets);
+    }
+    if(dim->irregular && dim->widths!=NULL) {
+      miset_dimension_widths(h->file_dims[ndims-i-1],
+                             dim->length, 0, dim->widths);
     }
   }
   return MINC2_SUCCESS;
@@ -1215,16 +1289,20 @@ static int _minc2_cleanup_dimensions(minc2_file_handle h)
   if(h->dimension_step)  free(h->dimension_step);
   if(h->file_dims)       free(h->file_dims);
   if(h->apparent_dims)   free(h->apparent_dims);
-  /* Free per-sample offsets owned by the facade for any irregular dim
-     before freeing the dim arrays themselves. */
+  /* Free per-sample offsets/widths owned by the facade for any irregular
+     dim before freeing the dim arrays themselves. */
   if(h->store_dims) {
-    for(i=0;i<h->ndims;i++)
+    for(i=0;i<h->ndims;i++) {
       if(h->store_dims[i].offsets) { free(h->store_dims[i].offsets); h->store_dims[i].offsets=NULL; }
+      if(h->store_dims[i].widths)  { free(h->store_dims[i].widths);  h->store_dims[i].widths=NULL; }
+    }
     free(h->store_dims);
   }
   if(h->representation_dims) {
-    for(i=0;i<h->ndims;i++)
+    for(i=0;i<h->ndims;i++) {
       if(h->representation_dims[i].offsets) { free(h->representation_dims[i].offsets); h->representation_dims[i].offsets=NULL; }
+      if(h->representation_dims[i].widths)  { free(h->representation_dims[i].widths);  h->representation_dims[i].widths=NULL; }
+    }
     free(h->representation_dims);
   }
   if(h->tmp_start)       free(h->tmp_start);

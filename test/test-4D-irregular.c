@@ -25,6 +25,8 @@
 #define EXP_LEN 6
 static const double EXPECTED_OFFSETS[EXP_LEN] =
     { 0.0, 120.0, 300.0, 800.0, 1200.0, 1500.0 };
+static const double EXPECTED_WIDTHS[EXP_LEN] =
+    { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
 
 #define FAIL_IF(cond, msg)                                                 \
     do {                                                                   \
@@ -67,6 +69,17 @@ static int test_read(const char *path)
             fprintf(stderr,
                     "FAIL offsets[%d]: expected %g, got %g\n",
                     i, EXPECTED_OFFSETS[i], dims[t].offsets[i]);
+            return 1;
+        }
+    }
+
+    /* Cycle 5: widths should be populated for irregular time dim */
+    FAIL_IF(dims[t].widths == NULL, "time widths should be populated");
+    for (i = 0; i < EXP_LEN; i++) {
+        if (fabs(dims[t].widths[i] - EXPECTED_WIDTHS[i]) > 1e-9) {
+            fprintf(stderr,
+                    "FAIL widths[%d]: expected %g, got %g\n",
+                    i, EXPECTED_WIDTHS[i], dims[t].widths[i]);
             return 1;
         }
     }
@@ -128,6 +141,20 @@ static int test_write(const char *out_path)
         }
     }
 
+    /* Cycle 6: when the caller doesn't supply widths, libminc's
+       miget_dimension_widths falls back to fabs(step). The dim above is
+       defined with step=1.0, so we expect 1.0 widths. (See
+       libminc/libsrc2/dimension.c:1577–1591 for the fallback chain.) */
+    FAIL_IF(got[t].widths == NULL, "reopened widths should be populated");
+    for (i = 0; i < EXP_LEN; i++) {
+        if (fabs(got[t].widths[i] - 1.0) > 1e-9) {
+            fprintf(stderr,
+                    "FAIL default widths[%d]: expected 1.0 (=fabs(step)), got %g\n",
+                    i, got[t].widths[i]);
+            return 1;
+        }
+    }
+
     FAIL_IF(minc2_close(h_in) != MINC2_SUCCESS, "close reopened");
     minc2_free(h_in);
     return 0;
@@ -159,6 +186,23 @@ static int test_compare(void)
     rc_neq = minc2_compare_dimensions(a, b);
     FAIL_IF(rc_neq == MINC2_SUCCESS,
             "irregular dims with different offsets must compare unequal");
+
+    /* Cycle 7: widths comparison */
+    double wid_a[EXP_LEN] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
+    double wid_b[EXP_LEN] = { 2.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
+    a[0].offsets = off_a;
+    b[0].offsets = off_a;
+    a[0].widths = wid_a;
+    b[0].widths = wid_a;       /* same pointer → equal */
+
+    rc_eq = minc2_compare_dimensions(a, b);
+    FAIL_IF(rc_eq != MINC2_SUCCESS, "identical irregular dims with widths should compare equal");
+
+    b[0].widths = wid_b;       /* different array → not equal */
+    rc_neq = minc2_compare_dimensions(a, b);
+    FAIL_IF(rc_neq == MINC2_SUCCESS,
+            "irregular dims with different widths must compare unequal");
+
     return 0;
 }
 
@@ -218,6 +262,18 @@ static int test_full_cycle(const char *fixture_path, const char *out_path)
             fprintf(stderr,
                     "FAIL full-cycle offsets[%d]: expected %g, got %g\n",
                     i, EXPECTED_OFFSETS[i], back_store[t_back].offsets[i]);
+            free(src_buf);
+            return 1;
+        }
+    }
+
+    /* Cycle 9: widths survive full round-trip */
+    FAIL_IF(back_store[t_back].widths == NULL, "fc: back widths populated");
+    for (i = 0; i < EXP_LEN; i++) {
+        if (fabs(back_store[t_back].widths[i] - EXPECTED_WIDTHS[i]) > 1e-9) {
+            fprintf(stderr,
+                    "FAIL full-cycle widths[%d]: expected %g, got %g\n",
+                    i, EXPECTED_WIDTHS[i], back_store[t_back].widths[i]);
             free(src_buf);
             return 1;
         }

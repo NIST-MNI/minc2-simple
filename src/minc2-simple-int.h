@@ -69,6 +69,11 @@ struct minc2_dimension
    * copied via miset_dimension_offsets).
    */
   double *offsets;
+  /**
+   * Per-sample FWHM widths for irregular dimensions; NULL otherwise.
+   * Length == .length doubles. Same ownership semantics as offsets.
+   */
+  double *widths;
 };
 
 /**

@@ -38,8 +38,8 @@ class minc2_transform_parameters(object):
 minc2_dim=collections.namedtuple(
     'minc2_dim',
     ['id', 'length', 'start', 'step', 'have_dir_cos', 'dir_cos',
-     'irregular', 'offsets'],
-    defaults=[False, None],   # back-compat: existing callers omit these
+     'irregular', 'offsets', 'widths'],
+    defaults=[False, None, None],   # back-compat: existing callers omit these
 )
 
 
@@ -184,11 +184,18 @@ class minc2_file:
             ffi.memmove(ffi.cast("double *", offsets.ctypes.data),
                         d.offsets,
                         d.length * ffi.sizeof('double'))
+        # Per-sample widths for irregular dims.
+        widths = None
+        if d.irregular and d.widths != ffi.NULL:
+            widths = np.empty(d.length, dtype=np.float64)
+            ffi.memmove(ffi.cast("double *", widths.ctypes.data),
+                        d.widths,
+                        d.length * ffi.sizeof('double'))
         dd = minc2_dim(id=d.id, length=d.length, start=d.start, step=d.step,
                        have_dir_cos=d.have_dir_cos,
                        dir_cos=np.zeros(3, np.float64),
                        irregular=bool(d.irregular),
-                       offsets=offsets)
+                       offsets=offsets, widths=widths)
         if d.have_dir_cos:
             ffi.memmove(ffi.cast("double [3]", dd.dir_cos.ctypes.data), d.dir_cos, 3*ffi.sizeof('double'))
         return dd
@@ -278,6 +285,7 @@ class minc2_file:
             # minc2_define call (the C side reads but does not copy them
             # synchronously; the deep-copy happens inside minc2_define).
             _offset_keepalive = []
+            _width_keepalive = []
             for i,j in enumerate(dims):
                 if isinstance(j, minc2_dim):
                     _dims[i].id=j.id
@@ -293,12 +301,17 @@ class minc2_file:
                         buf = ffi.new("double[]", list(off))
                         _dims[i].offsets = buf
                         _offset_keepalive.append(buf)
+                    if j.irregular and j.widths is not None:
+                        wid = np.ascontiguousarray(j.widths, dtype=np.float64)
+                        buf = ffi.new("double[]", list(wid))
+                        _dims[i].widths = buf
+                        _width_keepalive.append(buf)
                 elif isinstance(j, dict):
-                    # Handle dict form, including the new irregular/offsets keys.
+                    # Handle dict form, including irregular/offsets/widths keys.
                     # CFFI's struct initializer handles every non-pointer
-                    # field; offsets needs explicit marshalling because a
-                    # numpy array doesn't auto-convert to `double *`.
-                    plain = {k: v for k, v in j.items() if k != 'offsets'}
+                    # field; offsets and widths need explicit marshalling because
+                    # numpy arrays don't auto-convert to `double *`.
+                    plain = {k: v for k, v in j.items() if k not in ('offsets', 'widths')}
                     _dims[i] = plain
                     offsets = j.get('offsets', None)
                     if j.get('irregular', False) and offsets is not None:
@@ -306,6 +319,12 @@ class minc2_file:
                         buf = ffi.new("double[]", list(off))
                         _dims[i].offsets = buf
                         _offset_keepalive.append(buf)
+                    widths = j.get('widths', None)
+                    if j.get('irregular', False) and widths is not None:
+                        wid = np.ascontiguousarray(widths, dtype=np.float64)
+                        buf = ffi.new("double[]", list(wid))
+                        _dims[i].widths = buf
+                        _width_keepalive.append(buf)
                 else:
                     _dims[i]=j
             _dims[len(dims)]={'id':lib.MINC2_DIM_END}

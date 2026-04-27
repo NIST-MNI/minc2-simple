@@ -1,6 +1,15 @@
+-- OBSOLETE: this Lua binding is no longer maintained or tested.
+-- Use the Python wrapper (../python) for current development.
+--
+-- The cdef below is kept in sync with src/minc2-simple-int.h purely so
+-- that, if anything still loads this module, the FFI struct layout
+-- matches the C library (struct minc2_dimension grew per-sample
+-- offsets/widths fields). No other Lua-side code paths are exercised
+-- by CI; treat at your own risk.
+--
 -- lua module to read and write minc2 files
 -- using minc2-simple c glue
--- using FFI 
+-- using FFI
 local ffi = require("ffi")
 require('torch')
 
@@ -69,6 +78,8 @@ struct minc2_dimension
   double start;          /**< dimension start  */
   int    have_dir_cos;   /**< flag that dimension cosines is valid*/
   double dir_cos[3];     /**< direction cosines*/
+  double *offsets;       /**< per-sample world coords for irregular dims; NULL otherwise */
+  double *widths;        /**< per-sample FWHM for irregular dims; NULL otherwise */
 };
 
 /**

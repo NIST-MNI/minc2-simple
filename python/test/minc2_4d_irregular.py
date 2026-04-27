@@ -14,7 +14,7 @@ import unittest
 
 import numpy as np
 
-from minc2_simple import minc2_file
+from minc2_simple import minc2_file, minc2_dim
 
 
 # Matches /app/subproject/minc2-simple/test/test_4D_irregular_offsets.mnc
@@ -119,6 +119,120 @@ class TestIrregularRoundTrip(unittest.TestCase):
                 self.assertTrue(back_dims[t].irregular)
                 np.testing.assert_allclose(
                     back_dims[t].offsets, custom, rtol=0, atol=1e-9
+                )
+            finally:
+                back.close()
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+
+class TestWidthsRoundTrip(unittest.TestCase):
+    """Custom widths round-trip: define with explicit widths, write, reopen."""
+
+    def test_custom_widths_roundtrip(self):
+        custom_offsets = np.array(
+            [0.5, 1.5, 4.0, 9.0, 16.0, 25.0], dtype=np.float64
+        )
+        custom_widths = np.array(
+            [2.0, 3.0, 4.5, 1.0, 5.5, 0.5], dtype=np.float64
+        )
+        dims = [
+            dict(
+                id=minc2_file.MINC2_DIM_TIME,
+                length=len(custom_offsets),
+                start=0.0,
+                step=1.0,
+                irregular=True,
+                offsets=custom_offsets,
+                widths=custom_widths,
+            ),
+            dict(id=minc2_file.MINC2_DIM_Z, length=3, start=0.0, step=1.0),
+            dict(id=minc2_file.MINC2_DIM_Y, length=3, start=0.0, step=1.0),
+            dict(id=minc2_file.MINC2_DIM_X, length=3, start=0.0, step=1.0),
+        ]
+
+        path = tempfile.NamedTemporaryFile(
+            prefix="minc2-widths-", suffix=".mnc", delete=False
+        ).name
+        try:
+            out = minc2_file()
+            out.define(dims, minc2_file.MINC2_FLOAT, minc2_file.MINC2_FLOAT)
+            out.create(path)
+            data = np.arange(
+                len(custom_offsets) * 3 * 3 * 3, dtype=np.float32
+            ).reshape((len(custom_offsets), 3, 3, 3))
+            out.save_complete_volume(data)
+            out.close()
+
+            back = minc2_file(path)
+            try:
+                back_dims = back.representation_dims()
+                t = _find_time(back_dims)
+                self.assertTrue(back_dims[t].irregular)
+                np.testing.assert_allclose(
+                    back_dims[t].offsets, custom_offsets, rtol=0, atol=1e-9
+                )
+                np.testing.assert_allclose(
+                    back_dims[t].widths, custom_widths, rtol=0, atol=1e-9
+                )
+            finally:
+                back.close()
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_minic2_dim_with_widths(self):
+        """Define using minc2_dim namedtuple (not dict)."""
+        custom_offsets = np.array([0.0, 1.0, 2.0], dtype=np.float64)
+        custom_widths = np.array([1.5, 2.5, 3.5], dtype=np.float64)
+        dims = [
+            minc2_dim(
+                id=minc2_file.MINC2_DIM_TIME,
+                length=3,
+                start=0.0,
+                step=1.0,
+                have_dir_cos=False,
+                dir_cos=np.zeros(3, np.float64),
+                irregular=True,
+                offsets=custom_offsets,
+                widths=custom_widths,
+            ),
+            minc2_dim(
+                id=minc2_file.MINC2_DIM_Z, length=2, start=0.0, step=1.0,
+                have_dir_cos=False, dir_cos=np.zeros(3, np.float64),
+                irregular=False, offsets=None, widths=None,
+            ),
+            minc2_dim(
+                id=minc2_file.MINC2_DIM_Y, length=2, start=0.0, step=1.0,
+                have_dir_cos=False, dir_cos=np.zeros(3, np.float64),
+                irregular=False, offsets=None, widths=None,
+            ),
+            minc2_dim(
+                id=minc2_file.MINC2_DIM_X, length=2, start=0.0, step=1.0,
+                have_dir_cos=False, dir_cos=np.zeros(3, np.float64),
+                irregular=False, offsets=None, widths=None,
+            ),
+        ]
+
+        path = tempfile.NamedTemporaryFile(
+            prefix="minc2-widths-namedtuple-", suffix=".mnc", delete=False
+        ).name
+        try:
+            out = minc2_file()
+            out.define(dims, minc2_file.MINC2_FLOAT, minc2_file.MINC2_FLOAT)
+            out.create(path)
+            data = np.arange(3 * 2 * 2 * 2, dtype=np.float32).reshape((3, 2, 2, 2))
+            out.save_complete_volume(data)
+            out.close()
+
+            back = minc2_file(path)
+            try:
+                back_dims = back.representation_dims()
+                t = _find_time(back_dims)
+                self.assertTrue(back_dims[t].irregular)
+                np.testing.assert_allclose(
+                    back_dims[t].widths, custom_widths, rtol=0, atol=1e-9
                 )
             finally:
                 back.close()
