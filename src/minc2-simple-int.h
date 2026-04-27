@@ -61,6 +61,14 @@ struct minc2_dimension
   double start;          /**< dimension start  */
   int    have_dir_cos;   /**< flag that dimension cosines is valid*/
   double dir_cos[3];     /**< direction cosines*/
+  /**
+   * Per-sample world coordinates for irregular dimensions; NULL otherwise.
+   * Length == .length doubles. The facade owns this allocation when the
+   * struct is exposed via minc2_get_*_dimensions; callers that pass a
+   * struct in to minc2_define own their own offsets array (the values are
+   * copied via miset_dimension_offsets).
+   */
+  double *offsets;
 };
 
 /**
